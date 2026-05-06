@@ -186,3 +186,55 @@ types:
 This type is represented in the Python tool here (see below) as the
 type `CatalogueEntry`.  In the front-end, the zod object is
 `zDemoCatalogueEntry` and the type is `DemoCatalogueEntry`.
+
+
+## Tools
+
+The `$REPO_ROOT/build-tool` directory contains the tool which turns
+the demo content as stored in this repo into the "distribution" ready
+to be served.  The tools must be run under `poetry`, as shown below.
+
+### Tool to build distribution structure
+
+``` shell
+cd $REPO_ROOT
+poetry run -P build-tool build-dist $DEMO_CATALOGUE_REPO_ROOT dist
+```
+
+Reads all demos under `$DEMO_CATALOGUE_REPO_ROOT` and writes a
+distribution file structure under `dist/`.  In principle, a directory
+other than `dist` could be specified, but this is unlikely to be
+useful.
+
+### Tool to create a new demo
+
+A common use case is that a demo author has created, in Pytch, a
+project suitable to be a demo.  They can then run, for example,
+
+``` shell
+cd $REPO_ROOT
+poetry run -P build-tool new-demo \
+    $DEMO_CATALOGUE_REPO_ROOT/demos/whizzy-games/feed-the-kittens \
+    en \
+    feed-kittens.zip
+```
+
+(shown on multiple lines here but can be typed on one).
+
+The parts of this command which will vary case by case are:
+
+* `$DEMO_CATALOGUE_REPO_ROOT/demos/whizzy-games/feed-the-kittens` —
+  Directory which will hold the content for the new demo.
+
+* `en` — What language this demo will be in.
+
+* `feed-kittens.zip` — The zipfile, downloaded from Pytch, containing
+  the project itself.
+
+It is permissible for the demo to already exist but not in the given
+language, in which case a new language is added to the existing demo.
+
+The result will be a collection of files including some marked with
+TODOs.  Once the content of the `description.md` and `summary.md`
+files has been written, and the metadata filled in, the new files can
+all be committed to git.
