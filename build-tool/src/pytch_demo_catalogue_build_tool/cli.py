@@ -36,7 +36,9 @@ def log_level_option():
 @click.command()
 @click.argument("demos-repo", type=dir_argument())
 @click.argument("dist-root", type=dir_argument())
-def build_dist(demos_repo: str, dist_root: str):
+@log_level_option()
+def build_dist(demos_repo: str, dist_root: str, log_level: int):
+    configure_logging(log_level)
     pytch_demo_catalogue_build_tool.version_data.main(Path(demos_repo), Path(dist_root))
 
 
@@ -44,7 +46,14 @@ def build_dist(demos_repo: str, dist_root: str):
 @click.argument("new-demo-dirname", type=str)
 @click.argument("locale", type=str)
 @click.argument("project-zipfile", type=click.Path(dir_okay=False, exists=True))
-def new_demo(new_demo_dirname: str, locale: str, project_zipfile: str):
+@log_level_option()
+def new_demo(
+    new_demo_dirname: str,
+    locale: str,
+    project_zipfile: str,
+    log_level: int,
+):
+    configure_logging(log_level)
     pytch_demo_catalogue_build_tool.new_demo.main(
         Path(new_demo_dirname), locale, Path(project_zipfile)
     )
