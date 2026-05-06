@@ -2,8 +2,20 @@
 
 import click
 from pathlib import Path
+import colorlog
 import pytch_demo_catalogue_build_tool.version_data
 import pytch_demo_catalogue_build_tool.new_demo
+
+
+def configure_logging(log_level: int):
+    log_handler = colorlog.StreamHandler()
+    log_handler.setFormatter(
+        colorlog.ColoredFormatter("%(log_color)s%(levelname)s : %(message)s")
+    )
+
+    logger = colorlog.getLogger()  # Root logger
+    logger.addHandler(log_handler)
+    logger.setLevel(log_level)
 
 
 def dir_argument():
