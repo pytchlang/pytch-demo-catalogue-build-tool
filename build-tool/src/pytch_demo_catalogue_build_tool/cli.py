@@ -1,6 +1,7 @@
 """Console scripts for pytchbuild"""
 
 import click
+from click_loglevel import LogLevel
 from pathlib import Path
 import colorlog
 import pytch_demo_catalogue_build_tool.version_data
@@ -20,6 +21,16 @@ def configure_logging(log_level: int):
 
 def dir_argument():
     return click.Path(file_okay=False, dir_okay=True)
+
+
+def log_level_option():
+    return click.option(
+        "--log-level",
+        type=LogLevel(),
+        default="WARNING",
+        help="Set logging level",
+        show_default=True,
+    )
 
 
 @click.command()
