@@ -194,6 +194,15 @@ The `$REPO_ROOT/build-tool` directory contains the tool which turns
 the demo content as stored in this repo into the "distribution" ready
 to be served.  The tools must be run under `poetry`, as shown below.
 
+The tools support a `--log-level` option to increase verbosity.  For
+example,
+
+``` shell
+--log-level=INFO
+```
+
+can be useful to see what the tools are doing.
+
 ### Tool to build distribution structure
 
 ``` shell
@@ -205,6 +214,13 @@ Reads all demos under `$DEMO_CATALOGUE_REPO_ROOT` and writes a
 distribution file structure under `dist/`.  In principle, a directory
 other than `dist` could be specified, but this is unlikely to be
 useful.
+
+As noted above, verbosity can be increased:
+
+``` shell
+poetry run -P build-tool build-dist --log-level=INFO \
+    $DEMO_CATALOGUE_REPO_ROOT dist
+```
 
 ### Tool to create a new demo
 
