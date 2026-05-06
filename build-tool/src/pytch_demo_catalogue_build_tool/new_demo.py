@@ -2,8 +2,11 @@ from pathlib import Path
 import json
 import uuid
 import zipfile
+import colorlog
 
 from .constants import DemoRepoPaths
+
+logger = colorlog.getLogger(__name__)
 
 
 class PlaceholderMetadata:
@@ -27,6 +30,7 @@ def main(demo_dir: Path, locale: str, project_zipfile: Path):
         with (demo_dir / DemoRepoPaths.Uuid_File).open("wt") as f_uuid:
             f_uuid.write(f"{uuid.uuid4()}\n")
         locales_dir.mkdir()
+        logger.info(f"Created directory {demo_dir} with top-level contents")
 
     new_locale_dir = locales_dir / locale
     if new_locale_dir.exists():
@@ -53,3 +57,5 @@ def main(demo_dir: Path, locale: str, project_zipfile: Path):
 
     zip = zipfile.ZipFile(project_zipfile)
     zip.extractall(project_root)
+
+    logger.info(f"Created and populated directory {new_locale_dir}")
