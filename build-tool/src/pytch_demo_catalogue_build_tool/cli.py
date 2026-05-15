@@ -6,6 +6,7 @@ from pathlib import Path
 import colorlog
 import pytch_demo_catalogue_build_tool.version_data
 import pytch_demo_catalogue_build_tool.new_demo
+import pytch_demo_catalogue_build_tool.update_demo_project
 
 
 def configure_logging(log_level: int):
@@ -56,4 +57,21 @@ def new_demo(
     configure_logging(log_level)
     pytch_demo_catalogue_build_tool.new_demo.main(
         Path(new_demo_dirname), locale, Path(project_zipfile)
+    )
+
+
+@click.command()
+@click.argument("demo-dirname", type=str)
+@click.argument("locale", type=str)
+@click.argument("project-zipfile", type=click.Path(dir_okay=False, exists=True))
+@log_level_option()
+def update_demo(
+    demo_dirname: str,
+    locale: str,
+    project_zipfile: str,
+    log_level: int,
+):
+    configure_logging(log_level)
+    pytch_demo_catalogue_build_tool.update_demo_project.main(
+        Path(demo_dirname), locale, Path(project_zipfile)
     )
