@@ -76,14 +76,18 @@ class Extractor:
 
         self.all_uuids: set[str] = set()
         self.successors: dict[str, set[str]] = defaultdict(set)
-        # commit.id -> {uuid: (path_within_commit_tree, normalized_subtree_hash)}
+        # commit.id -> {uuid: (uuid_file_path, normalized_subtree_hash)}
         self.commit_demos: dict[pygit2.Oid, dict[str, tuple[str, str]]] = {}
 
         for commit in self.head_ancestry:
             self._scan_commit(commit)
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
-        self.defining_commits: dict[str, str] = self._find_defining_commits()
+        # uuid -> (defining-commit SHA1, path of that commit's
+        # ``pytch-demo-uuid.txt`` for this demo).
+        self.defining_commits: dict[str, tuple[str, str]] = (
+            self._find_defining_commits()
+        )
 
         assert self.defining_commits.keys() == self.all_uuids, (
             "Internal invariant violated: not every UUID has a defining commit."
@@ -100,7 +104,7 @@ class Extractor:
                 [u, self.chain_heads[u]] for u in sorted_uuids
             ],
             "majorVersionDefiningCommit": [
-                [u, self.defining_commits[u]] for u in sorted_uuids
+                [u, *self.defining_commits[u]] for u in sorted_uuids
             ],
         }
 
@@ -144,10 +148,12 @@ class Extractor:
         tree: pygit2.Tree,
         prefix: str = "",
     ):
-        """Yield ``(uuid, demo_root_path, demo_tree)`` for every demo in ``tree``.
+        """Yield ``(uuid, uuid_file_path, demo_tree)`` for every demo in ``tree``.
 
         ``commit`` is threaded through purely for error-message context;
         ``tree`` is expected to be reachable from ``commit.tree``.
+        ``uuid_file_path`` is the path of the demo's
+        ``pytch-demo-uuid.txt`` file, relative to the commit root.
 
         Interpretation note: a demo's root is the directory containing
         ``pytch-demo-uuid.txt``.  I assume demos do not nest inside other
@@ -157,11 +163,12 @@ class Extractor:
         """
         for entry in tree:
             if entry.type_str == "blob" and entry.name == UUID_FILENAME:
+                uuid_file_path = f"{prefix}{UUID_FILENAME}"
                 uuid = self._read_uuid_blob(
                     entry.id,
-                    f"{prefix}{UUID_FILENAME} in commit {commit.id}",
+                    f"{uuid_file_path} in commit {commit.id}",
                 )
-                yield uuid, prefix, tree
+                yield uuid, uuid_file_path, tree
                 # Don't recurse into a demo root.
                 return
 
@@ -282,8 +289,13 @@ class Extractor:
     # Finding the defining commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_defining_commits(self) -> dict[str, str]:
-        """Find the unique most-recent modification commit for every UUID."""
+    def _find_defining_commits(self) -> dict[str, tuple[str, str]]:
+        """Find the unique most-recent modification commit for every UUID.
+
+        Returns a mapping ``uuid -> (sha1, uuid_file_path)``, where
+        ``uuid_file_path`` is the path of the demo's
+        ``pytch-demo-uuid.txt`` file within the chosen commit's tree.
+        """
         mod_commits: dict[str, list[pygit2.Commit]] = defaultdict(list)
         for commit in self.head_ancestry:
             demos_here = self.commit_demos[commit.id]
@@ -291,7 +303,7 @@ class Extractor:
                 if self._is_modification(commit, uuid, h):
                     mod_commits[uuid].append(commit)
 
-        defining: dict[str, str] = {}
+        defining: dict[str, tuple[str, str]] = {}
         for uuid in self.all_uuids:
             candidates = mod_commits.get(uuid, [])
             # Every UUID in all_uuids appears in some commit's tree within
@@ -303,30 +315,30 @@ class Extractor:
                 f"for UUID {uuid}."
             )
             maxima = self._topological_maxima(candidates)
-            if len(maxima) == 1:
-                defining[uuid] = str(maxima[0].id)
-                continue
-
-            # Multiple incomparable maxima.
-            #
-            # Interpretation note: the spec says the *state* must be
-            # well-defined.  If the normalized content of the demo agrees
-            # across all maxima then only the choice of *SHA1* is
-            # ambiguous; I treat that as well-defined and pick
-            # deterministically (latest commit_time, then lexicographically
-            # largest SHA1).  If the content itself disagrees the state
-            # really is ambiguous and we raise, as the spec instructs.
-            hashes = {self.commit_demos[m.id][uuid][1] for m in maxima}
-            if len(hashes) > 1:
-                sha_list = ", ".join(str(m.id) for m in maxima)
-                raise RuntimeError(
-                    f"Ambiguous most-recent state for demo-major-version "
-                    f"{uuid}: incomparable modification commits {sha_list} "
-                    f"have differing content.  See old-versions.md for how "
-                    f"to disambiguate."
+            if len(maxima) > 1:
+                # Interpretation note: the spec says the *state* must be
+                # well-defined.  If the normalized content of the demo
+                # agrees across all maxima then only the choice of *SHA1*
+                # is ambiguous; I treat that as well-defined and pick
+                # deterministically (latest commit_time, then
+                # lexicographically largest SHA1).  If the content itself
+                # disagrees the state really is ambiguous and we raise,
+                # as the spec instructs.
+                hashes = {self.commit_demos[m.id][uuid][1] for m in maxima}
+                if len(hashes) > 1:
+                    sha_list = ", ".join(str(m.id) for m in maxima)
+                    raise RuntimeError(
+                        f"Ambiguous most-recent state for demo-major-version "
+                        f"{uuid}: incomparable modification commits "
+                        f"{sha_list} have differing content.  See "
+                        f"old-versions.md for how to disambiguate."
+                    )
+                maxima.sort(
+                    key=lambda c: (c.commit_time, str(c.id)), reverse=True
                 )
-            maxima.sort(key=lambda c: (c.commit_time, str(c.id)), reverse=True)
-            defining[uuid] = str(maxima[0].id)
+            chosen = maxima[0]
+            uuid_file_path = self.commit_demos[chosen.id][uuid][0]
+            defining[uuid] = (str(chosen.id), uuid_file_path)
 
         return defining
 
