@@ -22,11 +22,38 @@ import hashlib
 import json
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
 
 import pygit2
 
 
 UUID_FILENAME = "pytch-demo-uuid.txt"
+
+
+# ---------------------------------------------------------------------------
+# Internal record types
+# ---------------------------------------------------------------------------
+
+@dataclass
+class FoundDemo:
+    """A demo discovered while walking a commit's tree."""
+    uuid: str
+    uuid_file_path: str
+    demo_tree: pygit2.Tree
+
+
+@dataclass
+class DemoSnapshot:
+    """Per-(commit, uuid) record: where the demo lives and its content hash."""
+    uuid_file_path: str
+    normalized_hash: str
+
+
+@dataclass
+class DefiningCommit:
+    """The commit chosen as defining the most recent state of a demo."""
+    sha1: str
+    uuid_file_path: str
 
 
 # ---------------------------------------------------------------------------
@@ -76,16 +103,14 @@ class Extractor:
 
         self.all_uuids: set[str] = set()
         self.successors: dict[str, set[str]] = defaultdict(set)
-        # commit.id -> {uuid: (uuid_file_path, normalized_subtree_hash)}
-        self.commit_demos: dict[pygit2.Oid, dict[str, tuple[str, str]]] = {}
+        # commit.id -> {uuid: DemoSnapshot}
+        self.commit_demos: dict[pygit2.Oid, dict[str, DemoSnapshot]] = {}
 
         for commit in self.head_ancestry:
             self._scan_commit(commit)
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
-        # uuid -> (defining-commit SHA1, path of that commit's
-        # ``pytch-demo-uuid.txt`` for this demo).
-        self.defining_commits: dict[str, tuple[str, str]] = (
+        self.defining_commits: dict[str, DefiningCommit] = (
             self._find_defining_commits()
         )
 
@@ -104,7 +129,8 @@ class Extractor:
                 [u, self.chain_heads[u]] for u in sorted_uuids
             ],
             "majorVersionDefiningCommit": [
-                [u, *self.defining_commits[u]] for u in sorted_uuids
+                [u, (dc := self.defining_commits[u]).sha1, dc.uuid_file_path]
+                for u in sorted_uuids
             ],
         }
 
@@ -113,10 +139,13 @@ class Extractor:
     # ---------------------------------------------------------------
 
     def _scan_commit(self, commit: pygit2.Commit) -> None:
-        demos_here: dict[str, tuple[str, str]] = {}
-        for uuid, path, demo_tree in self._iter_demos(commit, commit.tree):
-            self.all_uuids.add(uuid)
-            demos_here[uuid] = (path, self._normalized_demo_hash(demo_tree))
+        demos_here: dict[str, DemoSnapshot] = {}
+        for found in self._iter_demos(commit, commit.tree):
+            self.all_uuids.add(found.uuid)
+            demos_here[found.uuid] = DemoSnapshot(
+                uuid_file_path=found.uuid_file_path,
+                normalized_hash=self._normalized_demo_hash(found.demo_tree),
+            )
         self.commit_demos[commit.id] = demos_here
 
         for parent in commit.parents:
@@ -148,12 +177,10 @@ class Extractor:
         tree: pygit2.Tree,
         prefix: str = "",
     ):
-        """Yield ``(uuid, uuid_file_path, demo_tree)`` for every demo in ``tree``.
+        """Yield a :class:`FoundDemo` for every demo in ``tree``.
 
         ``commit`` is threaded through purely for error-message context;
         ``tree`` is expected to be reachable from ``commit.tree``.
-        ``uuid_file_path`` is the path of the demo's
-        ``pytch-demo-uuid.txt`` file, relative to the commit root.
 
         Interpretation note: a demo's root is the directory containing
         ``pytch-demo-uuid.txt``.  I assume demos do not nest inside other
@@ -168,7 +195,11 @@ class Extractor:
                     entry.id,
                     f"{uuid_file_path} in commit {commit.id}",
                 )
-                yield uuid, uuid_file_path, tree
+                yield FoundDemo(
+                    uuid=uuid,
+                    uuid_file_path=uuid_file_path,
+                    demo_tree=tree,
+                )
                 # Don't recurse into a demo root.
                 return
 
@@ -289,21 +320,16 @@ class Extractor:
     # Finding the defining commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_defining_commits(self) -> dict[str, tuple[str, str]]:
-        """Find the unique most-recent modification commit for every UUID.
-
-        Returns a mapping ``uuid -> (sha1, uuid_file_path)``, where
-        ``uuid_file_path`` is the path of the demo's
-        ``pytch-demo-uuid.txt`` file within the chosen commit's tree.
-        """
+    def _find_defining_commits(self) -> dict[str, DefiningCommit]:
+        """Find the unique most-recent modification commit for every UUID."""
         mod_commits: dict[str, list[pygit2.Commit]] = defaultdict(list)
         for commit in self.head_ancestry:
             demos_here = self.commit_demos[commit.id]
-            for uuid, (_path, h) in demos_here.items():
-                if self._is_modification(commit, uuid, h):
+            for uuid, snapshot in demos_here.items():
+                if self._is_modification(commit, uuid, snapshot.normalized_hash):
                     mod_commits[uuid].append(commit)
 
-        defining: dict[str, tuple[str, str]] = {}
+        defining: dict[str, DefiningCommit] = {}
         for uuid in self.all_uuids:
             candidates = mod_commits.get(uuid, [])
             # Every UUID in all_uuids appears in some commit's tree within
@@ -324,7 +350,9 @@ class Extractor:
                 # lexicographically largest SHA1).  If the content itself
                 # disagrees the state really is ambiguous and we raise,
                 # as the spec instructs.
-                hashes = {self.commit_demos[m.id][uuid][1] for m in maxima}
+                hashes = {
+                    self.commit_demos[m.id][uuid].normalized_hash for m in maxima
+                }
                 if len(hashes) > 1:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
@@ -337,8 +365,10 @@ class Extractor:
                     key=lambda c: (c.commit_time, str(c.id)), reverse=True
                 )
             chosen = maxima[0]
-            uuid_file_path = self.commit_demos[chosen.id][uuid][0]
-            defining[uuid] = (str(chosen.id), uuid_file_path)
+            defining[uuid] = DefiningCommit(
+                sha1=str(chosen.id),
+                uuid_file_path=self.commit_demos[chosen.id][uuid].uuid_file_path,
+            )
 
         return defining
 
@@ -360,8 +390,8 @@ class Extractor:
             # Invariant: every parent of a HEAD-ancestor is itself a
             # HEAD-ancestor, so parent.id is always a key of commit_demos.
             parent_demos = self.commit_demos[parent.id]
-            parent_entry = parent_demos.get(uuid)
-            if parent_entry is not None and parent_entry[1] == h:
+            parent_snapshot = parent_demos.get(uuid)
+            if parent_snapshot is not None and parent_snapshot.normalized_hash == h:
                 return False
         return True
 
