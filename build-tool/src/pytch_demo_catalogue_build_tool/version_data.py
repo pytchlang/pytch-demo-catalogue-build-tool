@@ -110,7 +110,7 @@ class Extractor:
 
     def _scan_commit(self, commit: pygit2.Commit) -> None:
         demos_here: dict[str, tuple[str, str]] = {}
-        for uuid, path, demo_tree in self._iter_demos(commit.tree):
+        for uuid, path, demo_tree in self._iter_demos(commit, commit.tree):
             self.all_uuids.add(uuid)
             demos_here[uuid] = (path, self._normalized_demo_hash(demo_tree))
         self.commit_demos[commit.id] = demos_here
@@ -123,12 +123,31 @@ class Extractor:
                 # (the parent's, and this commit's, respectively) and so
                 # are picked up by _iter_demos in those iterations.
 
+    def _read_uuid_blob(self, oid: pygit2.Oid, where: str) -> str:
+        """Read a uuid blob, returning its stripped contents.
+
+        Raises ``RuntimeError`` (with ``where`` for context) if the file
+        is empty or whitespace-only.
+        """
+        uuid = self.repo[oid].data.decode("utf-8").strip()
+        if not uuid:
+            raise RuntimeError(f"{where} contains no UUID.")
+        return uuid
+
     # ---------------------------------------------------------------
     # Locating demos within a commit tree
     # ---------------------------------------------------------------
 
-    def _iter_demos(self, tree: pygit2.Tree, prefix: str = ""):
+    def _iter_demos(
+        self,
+        commit: pygit2.Commit,
+        tree: pygit2.Tree,
+        prefix: str = "",
+    ):
         """Yield ``(uuid, demo_root_path, demo_tree)`` for every demo in ``tree``.
+
+        ``commit`` is threaded through purely for error-message context;
+        ``tree`` is expected to be reachable from ``commit.tree``.
 
         Interpretation note: a demo's root is the directory containing
         ``pytch-demo-uuid.txt``.  I assume demos do not nest inside other
@@ -138,12 +157,10 @@ class Extractor:
         """
         for entry in tree:
             if entry.type_str == "blob" and entry.name == UUID_FILENAME:
-                uuid = self.repo[entry.id].data.decode("utf-8").strip()
-                if not uuid:
-                    raise RuntimeError(
-                        f"{UUID_FILENAME} at "
-                        f"{prefix or '<repo root>'} contains no UUID."
-                    )
+                uuid = self._read_uuid_blob(
+                    entry.id,
+                    f"{prefix}{UUID_FILENAME} in commit {commit.id}",
+                )
                 yield uuid, prefix, tree
                 # Don't recurse into a demo root.
                 return
@@ -151,7 +168,9 @@ class Extractor:
         for entry in tree:
             if entry.type_str == "tree":
                 sub_path = f"{prefix}{entry.name}/"
-                yield from self._iter_demos(self.repo[entry.id], sub_path)
+                yield from self._iter_demos(
+                    commit, self.repo[entry.id], sub_path
+                )
 
     # ---------------------------------------------------------------
     # Hashing a demo subtree with the ``recommended`` flag stripped
@@ -209,18 +228,14 @@ class Extractor:
                 continue
             if _path_basename(delta.new_file.path) != UUID_FILENAME:
                 continue
-            old_uuid = self.repo[delta.old_file.id].data.decode("utf-8").strip()
-            new_uuid = self.repo[delta.new_file.id].data.decode("utf-8").strip()
-            if not old_uuid:
-                raise RuntimeError(
-                    f"{delta.old_file.path} is empty in commit "
-                    f"{parent_commit.id}."
-                )
-            if not new_uuid:
-                raise RuntimeError(
-                    f"{delta.new_file.path} is empty in commit "
-                    f"{child_commit.id}."
-                )
+            old_uuid = self._read_uuid_blob(
+                delta.old_file.id,
+                f"{delta.old_file.path} in commit {parent_commit.id}",
+            )
+            new_uuid = self._read_uuid_blob(
+                delta.new_file.id,
+                f"{delta.new_file.path} in commit {child_commit.id}",
+            )
             # old_uuid == new_uuid is benign (e.g. a mode-only delta), so
             # we filter rather than raise.
             if old_uuid != new_uuid:
