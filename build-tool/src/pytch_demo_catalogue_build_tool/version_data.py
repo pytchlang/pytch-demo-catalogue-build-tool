@@ -150,7 +150,7 @@ class Extractor:
 
         for entry in tree:
             if entry.type_str == "tree":
-                sub_path = f"{prefix}/{entry.name}" if prefix else entry.name
+                sub_path = f"{prefix}{entry.name}/"
                 yield from self._iter_demos(self.repo[entry.id], sub_path)
 
     # ---------------------------------------------------------------
