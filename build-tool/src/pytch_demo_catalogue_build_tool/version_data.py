@@ -89,15 +89,17 @@ def extract_data(repo: pygit2.Repository) -> dict:
         repo, head_ancestry, commit_demos, all_uuids
     )
 
+    assert defining_commits.keys() == all_uuids, (
+        "Internal invariant violated: not every UUID has a defining commit."
+    )
+
     sorted_uuids = sorted(all_uuids)
     return {
         "majorVersionChainHeadRecords": [
             [u, chain_heads[u]] for u in sorted_uuids
         ],
         "majorVersionDefiningCommit": [
-            [u, defining_commits[u]]
-            for u in sorted_uuids
-            if u in defining_commits
+            [u, defining_commits[u]] for u in sorted_uuids
         ],
     }
 
