@@ -41,7 +41,7 @@ def main() -> None:
         sys.exit(1)
     repo = pygit2.Repository(discovered)
 
-    output = Extractor(repo).extract()
+    output = Extractor(repo).results()
     json.dump(output, sys.stdout, indent=2)
     sys.stdout.write("\n")
 
@@ -53,27 +53,16 @@ def main() -> None:
 class Extractor:
     """Walks a repository's HEAD ancestry and produces demo-major-version data.
 
-    A single call to :meth:`extract` populates the instance attributes
-    as it goes and returns the JSON-shaped dict described in
-    ``old-versions.md``.  The instance is intended to be used once.
+    Construction performs the full analysis; :meth:`results` then
+    returns the JSON-shaped dict described in ``old-versions.md``.  An
+    instance is intended to be used once.
     """
 
     def __init__(self, repo: pygit2.Repository) -> None:
-        self.repo = repo
-        # Filled in during extract():
-        self.head_ancestry: list[pygit2.Commit] = []
-        self.all_uuids: set[str] = set()
-        self.successors: dict[str, set[str]] = defaultdict(set)
-        # commit.id -> {uuid: (path_within_commit_tree, normalized_subtree_hash)}
-        self.commit_demos: dict[pygit2.Oid, dict[str, tuple[str, str]]] = {}
-
-    # ---------------------------------------------------------------
-    # Top-level extraction
-    # ---------------------------------------------------------------
-
-    def extract(self) -> dict:
-        if self.repo.head_is_unborn:
+        if repo.head_is_unborn:
             raise RuntimeError("Repository has no HEAD; nothing to extract.")
+
+        self.repo = repo
 
         # Interpretation note: the spec says "searching every commit" for
         # uuid files.  I take "every commit" to mean every commit reachable
@@ -81,27 +70,37 @@ class Extractor:
         # state "as of HEAD" and describes updates to old major versions as
         # being merged back into the main line, so UUIDs that only ever
         # appear in a never-merged branch are out of scope.
-        self.head_ancestry = list(
-            self.repo.walk(self.repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL)
+        self.head_ancestry: list[pygit2.Commit] = list(
+            repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL)
         )
+
+        self.all_uuids: set[str] = set()
+        self.successors: dict[str, set[str]] = defaultdict(set)
+        # commit.id -> {uuid: (path_within_commit_tree, normalized_subtree_hash)}
+        self.commit_demos: dict[pygit2.Oid, dict[str, tuple[str, str]]] = {}
 
         for commit in self.head_ancestry:
             self._scan_commit(commit)
 
-        chain_heads = self._resolve_chain_heads()
-        defining_commits = self._find_defining_commits()
+        self.chain_heads: dict[str, str] = self._resolve_chain_heads()
+        self.defining_commits: dict[str, str] = self._find_defining_commits()
 
-        assert defining_commits.keys() == self.all_uuids, (
+        assert self.defining_commits.keys() == self.all_uuids, (
             "Internal invariant violated: not every UUID has a defining commit."
         )
 
+    # ---------------------------------------------------------------
+    # Formatting
+    # ---------------------------------------------------------------
+
+    def results(self) -> dict:
         sorted_uuids = sorted(self.all_uuids)
         return {
             "majorVersionChainHeadRecords": [
-                [u, chain_heads[u]] for u in sorted_uuids
+                [u, self.chain_heads[u]] for u in sorted_uuids
             ],
             "majorVersionDefiningCommit": [
-                [u, defining_commits[u]] for u in sorted_uuids
+                [u, self.defining_commits[u]] for u in sorted_uuids
             ],
         }
 
