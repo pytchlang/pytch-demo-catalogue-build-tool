@@ -149,15 +149,26 @@ def _hash_tree(repo, tree, h, prefix):
         h.update(rel.encode("utf-8"))
         if entry.type_str == "tree":
             _hash_tree(repo, repo[entry.id], h, rel)
-        else:
-            data = repo[entry.id].data
-            data = _normalize_for_hash(rel, data)
+        elif _is_locale_metadata_path(rel):
+            # The recommended flag is ignored data, so we must read the
+            # blob, normalize it, and hash the normalized bytes.
+            data = _normalize_locale_metadata(repo[entry.id].data)
             h.update(b"\x00B")
             h.update(data)
+        else:
+            # A git blob's id is SHA-1 of ``"blob <len>\x00" + content``
+            # and therefore uniquely fingerprints the content, so we
+            # hash the id directly and spare a blob read from the
+            # object database.  Using a fixed-width id (20 bytes) also
+            # rules out the encoding-ambiguity collisions that the
+            # variable-length ``\x00B<data>`` form is otherwise prone
+            # to.
+            h.update(b"\x00I")
+            h.update(entry.id.raw)
 
 
-def _normalize_for_hash(rel_path: str, data: bytes) -> bytes:
-    """Strip the ``recommended`` flag from ``by-locale/<lang>/metadata.json``.
+def _is_locale_metadata_path(rel_path: str) -> bool:
+    """True for ``by-locale/<lang>/metadata.json`` within the demo root.
 
     Interpretation notes:
 
@@ -165,33 +176,38 @@ def _normalize_for_hash(rel_path: str, data: bytes) -> bytes:
       ``by-locale/<lang>/metadata.json``.  I take this path to be
       relative to the demo root, i.e. exactly three components deep
       within the demo subtree.  ``metadata.json`` at any other depth is
-      hashed verbatim.
+      hashed verbatim (via its blob id, like any other file).
 
     * The spec mentions ``en`` as a "two-letter language code" example,
       but real-world locale codes are sometimes longer (e.g. ``zh-CN``).
       I therefore accept any non-empty single path component in the
       middle position rather than enforcing exactly two letters.
-
-    * Normalisation replaces the flag with a fixed value rather than
-      deleting it, so demos that legitimately add/remove the flag (as
-      opposed to flipping it) still hash distinctly when other metadata
-      also changes.  Whether the flag is present at all is treated as
-      part of the ignored data.
     """
     parts = rel_path.split("/")
-    if (
+    return (
         len(parts) == 3
         and parts[0] == "by-locale"
         and parts[2] == "metadata.json"
-    ):
-        try:
-            obj = json.loads(data)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return data
-        if isinstance(obj, dict) and "recommended" in obj:
-            normalized = dict(obj)
-            normalized["recommended"] = False
-            return json.dumps(normalized, sort_keys=True).encode("utf-8")
+    )
+
+
+def _normalize_locale_metadata(data: bytes) -> bytes:
+    """Strip the ``recommended`` flag from a metadata.json blob.
+
+    Interpretation note: normalisation replaces the flag with a fixed
+    value rather than deleting it, so demos that legitimately add or
+    remove the flag (as opposed to flipping it) still hash distinctly
+    when other metadata also changes.  Whether the flag is present at
+    all is treated as part of the ignored data.
+    """
+    try:
+        obj = json.loads(data)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return data
+    if isinstance(obj, dict) and "recommended" in obj:
+        normalized = dict(obj)
+        normalized["recommended"] = False
+        return json.dumps(normalized, sort_keys=True).encode("utf-8")
     return data
 
 
