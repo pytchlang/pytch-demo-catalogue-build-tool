@@ -120,9 +120,13 @@ def iter_demos(repo: pygit2.Repository, tree: pygit2.Tree, prefix: str = ""):
     for entry in tree:
         if entry.type_str == "blob" and entry.name == UUID_FILENAME:
             uuid = repo[entry.id].data.decode("utf-8").strip()
-            if uuid:
-                yield uuid, prefix, tree
-            # Either way, don't recurse into a demo root.
+            if not uuid:
+                raise RuntimeError(
+                    f"{UUID_FILENAME} at "
+                    f"{prefix or '<repo root>'} contains no UUID."
+                )
+            yield uuid, prefix, tree
+            # Don't recurse into a demo root.
             return
 
     for entry in tree:
@@ -152,7 +156,7 @@ def _hash_tree(repo, tree, h, prefix):
         elif _is_locale_metadata_path(rel):
             # The recommended flag is ignored data, so we must read the
             # blob, normalize it, and hash the normalized bytes.
-            data = _normalize_locale_metadata(repo[entry.id].data)
+            data = _normalize_locale_metadata(rel, repo[entry.id].data)
             h.update(b"\x00B")
             h.update(data)
         else:
@@ -191,24 +195,31 @@ def _is_locale_metadata_path(rel_path: str) -> bool:
     )
 
 
-def _normalize_locale_metadata(data: bytes) -> bytes:
-    """Strip the ``recommended`` flag from a metadata.json blob.
+def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
+    """Remove the ``recommended`` key from a metadata.json blob.
 
-    Interpretation note: normalisation replaces the flag with a fixed
-    value rather than deleting it, so demos that legitimately add or
-    remove the flag (as opposed to flipping it) still hash distinctly
-    when other metadata also changes.  Whether the flag is present at
-    all is treated as part of the ignored data.
+    Any structural problem with the data is a fatal error: this file is
+    expected to be a JSON object that contains the ``recommended`` key,
+    so failing here loudly is preferable to silently producing a
+    different hash than would be expected.
     """
     try:
         obj = json.loads(data)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return data
-    if isinstance(obj, dict) and "recommended" in obj:
-        normalized = dict(obj)
-        normalized["recommended"] = False
-        return json.dumps(normalized, sort_keys=True).encode("utf-8")
-    return data
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise RuntimeError(
+            f"{rel_path}: contents could not be parsed as JSON ({e})"
+        ) from e
+    if not isinstance(obj, dict):
+        raise RuntimeError(
+            f"{rel_path}: top-level JSON value is "
+            f"{type(obj).__name__}, not an object."
+        )
+    if "recommended" not in obj:
+        raise RuntimeError(
+            f"{rel_path}: JSON object has no 'recommended' key."
+        )
+    normalized = {k: v for k, v in obj.items() if k != "recommended"}
+    return json.dumps(normalized, sort_keys=True).encode("utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +246,19 @@ def iter_uuid_replacements(repo, parent_commit, child_commit):
             continue
         old_uuid = repo[delta.old_file.id].data.decode("utf-8").strip()
         new_uuid = repo[delta.new_file.id].data.decode("utf-8").strip()
-        if old_uuid and new_uuid and old_uuid != new_uuid:
+        if not old_uuid:
+            raise RuntimeError(
+                f"{delta.old_file.path} is empty in commit "
+                f"{parent_commit.id}."
+            )
+        if not new_uuid:
+            raise RuntimeError(
+                f"{delta.new_file.path} is empty in commit "
+                f"{child_commit.id}."
+            )
+        # old_uuid == new_uuid is benign (e.g. a mode-only delta), so
+        # we filter rather than raise.
+        if old_uuid != new_uuid:
             yield old_uuid, new_uuid
 
 
@@ -350,7 +373,9 @@ def _is_modification(commit, uuid, h, commit_demos) -> bool:
     if not commit.parents:
         return True
     for parent in commit.parents:
-        parent_demos = commit_demos.get(parent.id, {})
+        # Invariant: every parent of a HEAD-ancestor is itself a
+        # HEAD-ancestor, so parent.id is always a key of commit_demos.
+        parent_demos = commit_demos[parent.id]
         parent_entry = parent_demos.get(uuid)
         if parent_entry is not None and parent_entry[1] == h:
             return False
