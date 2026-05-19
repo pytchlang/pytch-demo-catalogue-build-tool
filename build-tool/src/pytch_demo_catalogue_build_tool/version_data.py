@@ -370,8 +370,6 @@ def _is_modification(commit, uuid, h, commit_demos) -> bool:
     A root commit (no parents) that contains the demo is trivially a
     modification commit.
     """
-    if not commit.parents:
-        return True
     for parent in commit.parents:
         # Invariant: every parent of a HEAD-ancestor is itself a
         # HEAD-ancestor, so parent.id is always a key of commit_demos.
