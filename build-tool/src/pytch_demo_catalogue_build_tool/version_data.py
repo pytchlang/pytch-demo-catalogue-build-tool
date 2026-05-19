@@ -79,8 +79,10 @@ def extract_data(repo: pygit2.Repository) -> dict:
         for parent in commit.parents:
             for old_uuid, new_uuid in iter_uuid_replacements(repo, parent, commit):
                 successors[old_uuid].add(new_uuid)
-                all_uuids.add(old_uuid)
-                all_uuids.add(new_uuid)
+                # No need to add old_uuid / new_uuid to all_uuids here:
+                # both appear in some commit's tree within HEAD's ancestry
+                # (the parent's, and this commit's, respectively) and so
+                # are picked up by iter_demos in those iterations.
 
     chain_heads = resolve_chain_heads(all_uuids, successors)
     defining_commits = find_defining_commits(
@@ -276,13 +278,14 @@ def find_defining_commits(repo, head_ancestry, commit_demos, all_uuids):
     defining: dict[str, str] = {}
     for uuid in all_uuids:
         candidates = mod_commits.get(uuid, [])
-        if not candidates:
-            # A UUID with no modification commit in HEAD's ancestry was
-            # introduced only via a chain-link replacement (we recorded
-            # it as an old uuid in iter_uuid_replacements but never saw
-            # the demo subtree itself in HEAD's ancestry).  We have no
-            # defining commit for it.
-            continue
+        # Every UUID in all_uuids appears in some commit's tree within
+        # HEAD's ancestry (collected by iter_demos), and the commit that
+        # first introduces it is necessarily a modification commit, so
+        # mod_commits[uuid] is non-empty.
+        assert candidates, (
+            f"Internal invariant violated: no modification commit found "
+            f"for UUID {uuid}."
+        )
         maxima = _topological_maxima(repo, candidates)
         if len(maxima) == 1:
             defining[uuid] = str(maxima[0].id)
