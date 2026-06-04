@@ -373,7 +373,7 @@ class Extractor:
         return defining
 
     def _is_modification(self, commit, uuid, h) -> bool:
-        """True if ``commit`` introduced the current state of ``uuid``.
+        """True if ``commit`` updated the contents of demo ``uuid``.
 
         A commit is a "modification commit" for a demo if the demo exists
         in the commit's tree and the demo's (normalized) content differs
