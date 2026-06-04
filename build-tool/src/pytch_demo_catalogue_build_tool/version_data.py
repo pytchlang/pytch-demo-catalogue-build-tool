@@ -17,6 +17,7 @@ Each is a list of ``[uuid, value]`` pairs as described in the spec.
 """
 
 from __future__ import annotations
+from typing import Any, Generator
 
 import hashlib
 import json
@@ -103,7 +104,7 @@ class Extractor:
         # being merged back into the main line, so UUIDs that only ever
         # appear in a never-merged branch are out of scope.
         self.head_ancestry: list[pygit2.Commit] = list(
-            repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL)
+            repo.walk(repo.head.target, pygit2.enums.SortMode.TOPOLOGICAL)
         )
 
         self.all_uuids: set[str] = set()
@@ -125,7 +126,7 @@ class Extractor:
     # Formatting
     # ---------------------------------------------------------------
 
-    def results(self) -> dict:
+    def results(self) -> dict[str, Any]:
         sorted_uuids = sorted(self.all_uuids)
         return {
             "majorVersionChainHeadRecords": [
@@ -165,7 +166,11 @@ class Extractor:
         Raises ``RuntimeError`` (with ``where`` for context) if the file
         is empty or whitespace-only.
         """
-        uuid = self.repo[oid].data.decode("utf-8").strip()
+        obj = self.repo[oid]
+        if obj.type_str != "blob":
+            raise RuntimeError(f"object {oid} is not blob")
+        blob: pygit2.Blob = obj  # type: ignore
+        uuid = blob.data.decode("utf-8").strip()
         if not uuid:
             raise RuntimeError(f"{where} contains no UUID.")
         return uuid
@@ -179,7 +184,7 @@ class Extractor:
         commit: pygit2.Commit,
         tree: pygit2.Tree,
         prefix: str = "",
-    ):
+    ) -> Generator[FoundDemo]:
         """Yield a :class:`FoundDemo` for every demo in ``tree``.
 
         ``commit`` is threaded through purely for error-message context;
@@ -208,10 +213,9 @@ class Extractor:
 
         for entry in tree:
             if entry.type_str == "tree":
+                entry_tree: pygit2.Tree = entry  # type: ignore
                 sub_path = f"{prefix}{entry.name}/"
-                yield from self._iter_demos(
-                    commit, self.repo[entry.id], sub_path
-                )
+                yield from self._iter_demos(commit, entry_tree, sub_path)
 
     # ---------------------------------------------------------------
     # Hashing a demo subtree with the ``recommended`` flag stripped
@@ -223,17 +227,33 @@ class Extractor:
         self._hash_tree(demo_tree, h, "")
         return h.hexdigest()
 
-    def _hash_tree(self, tree, h, prefix):
-        for entry in sorted(tree, key=lambda e: e.name):
-            rel = f"{prefix}/{entry.name}" if prefix else entry.name
+    def _hash_tree(
+        self,
+        tree: pygit2.Tree,
+        h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
+        prefix: str,
+    ):
+        def name_of_tree_entry(entry: pygit2.Object) -> str:
+            if entry.name is None:
+                raise RuntimeError(f"Object {entry.id} has no name")
+            return entry.name
+
+        for entry in sorted(tree, key=name_of_tree_entry):
+            rel = f"{prefix}/{entry.name}" if prefix else name_of_tree_entry(entry)
             h.update(b"\x00P")
             h.update(rel.encode("utf-8"))
             if entry.type_str == "tree":
-                self._hash_tree(self.repo[entry.id], h, rel)
+                subtree: pygit2.Tree = entry  # type: ignore
+                self._hash_tree(subtree, h, rel)
             elif _is_locale_metadata_path(rel):
+                if entry.type_str != "blob":
+                    raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
+
+                blob: pygit2.Blob = entry  # type: ignore
+
                 # The recommended flag is ignored data, so we must read
                 # the blob, normalize it, and hash the normalized bytes.
-                data = _normalize_locale_metadata(rel, self.repo[entry.id].data)
+                data = _normalize_locale_metadata(rel, blob.data)
                 h.update(b"\x00B")
                 h.update(data)
             else:
@@ -251,7 +271,9 @@ class Extractor:
     # Detecting UUID replacements (major-version chain links)
     # ---------------------------------------------------------------
 
-    def _iter_uuid_replacements(self, parent_commit, child_commit):
+    def _iter_uuid_replacements(
+        self, parent_commit: pygit2.Commit, child_commit: pygit2.Commit
+    ):
         """Yield ``(old_uuid, new_uuid)`` for every uuid file modified in place.
 
         Interpretation note: rename detection is deliberately NOT used.
@@ -371,7 +393,7 @@ class Extractor:
 
         return defining
 
-    def _is_modification(self, commit, uuid, h) -> bool:
+    def _is_modification(self, commit: pygit2.Commit, uuid: str, h: str) -> bool:
         """True if ``commit`` updated the contents of demo ``uuid``.
 
         A commit is a "modification commit" for a demo if the demo exists
@@ -394,10 +416,10 @@ class Extractor:
                 return False
         return True
 
-    def _topological_maxima(self, commits):
+    def _topological_maxima(self, commits: list[pygit2.Commit]):
         """Return commits with no strict descendant within the same set."""
         ids = [c.id for c in commits]
-        maxima = []
+        maxima: list[pygit2.Commit] = []
         for c in commits:
             is_max = not any(
                 other != c.id and self.repo.descendant_of(other, c.id) for other in ids
@@ -444,13 +466,14 @@ def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
     so failing here loudly is preferable to silently producing a
     different hash than would be expected.
     """
+    obj: dict[str, Any]
     try:
         obj = json.loads(data)
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         raise RuntimeError(
             f"{rel_path}: contents could not be parsed as JSON ({e})"
         ) from e
-    if not isinstance(obj, dict):
+    if not isinstance(obj, dict):  # type: ignore
         raise RuntimeError(
             f"{rel_path}: top-level JSON value is "
             f"{type(obj).__name__}, not an object."
