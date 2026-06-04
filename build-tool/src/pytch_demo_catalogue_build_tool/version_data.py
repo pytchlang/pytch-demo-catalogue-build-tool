@@ -26,7 +26,6 @@ from dataclasses import dataclass
 
 import pygit2
 
-
 UUID_FILENAME = "pytch-demo-uuid.txt"
 
 
@@ -34,9 +33,11 @@ UUID_FILENAME = "pytch-demo-uuid.txt"
 # Internal record types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FoundDemo:
     """A demo discovered while walking a commit's tree."""
+
     uuid: str
     uuid_file_path: str
     demo_tree: pygit2.Tree
@@ -45,6 +46,7 @@ class FoundDemo:
 @dataclass
 class DemoSnapshot:
     """Per-(commit, uuid) record: where the demo lives and its content hash."""
+
     uuid_file_path: str
     normalized_hash: str
 
@@ -52,6 +54,7 @@ class DemoSnapshot:
 @dataclass
 class DefiningCommit:
     """The commit chosen as defining the most recent state of a demo."""
+
     sha1: str
     uuid_file_path: str
 
@@ -59,6 +62,7 @@ class DefiningCommit:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     repo_path_arg = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -76,6 +80,7 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 # Extractor
 # ---------------------------------------------------------------------------
+
 
 class Extractor:
     """Walks a repository's HEAD ancestry and produces demo-major-version data.
@@ -110,13 +115,11 @@ class Extractor:
             self._scan_commit(commit)
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
-        self.defining_commits: dict[str, DefiningCommit] = (
-            self._find_defining_commits()
-        )
+        self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
 
-        assert self.defining_commits.keys() == self.all_uuids, (
-            "Internal invariant violated: not every UUID has a defining commit."
-        )
+        assert (
+            self.defining_commits.keys() == self.all_uuids
+        ), "Internal invariant violated: not every UUID has a defining commit."
 
     # ---------------------------------------------------------------
     # Formatting
@@ -350,9 +353,7 @@ class Extractor:
                 # lexicographically largest SHA1).  If the content itself
                 # disagrees the state really is ambiguous and we raise,
                 # as the spec instructs.
-                hashes = {
-                    self.commit_demos[m.id][uuid].normalized_hash for m in maxima
-                }
+                hashes = {self.commit_demos[m.id][uuid].normalized_hash for m in maxima}
                 if len(hashes) > 1:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
@@ -361,9 +362,7 @@ class Extractor:
                         f"{sha_list} have differing content.  See "
                         f"old-versions.md for how to disambiguate."
                     )
-                maxima.sort(
-                    key=lambda c: (c.commit_time, str(c.id)), reverse=True
-                )
+                maxima.sort(key=lambda c: (c.commit_time, str(c.id)), reverse=True)
             chosen = maxima[0]
             defining[uuid] = DefiningCommit(
                 sha1=str(chosen.id),
@@ -401,8 +400,7 @@ class Extractor:
         maxima = []
         for c in commits:
             is_max = not any(
-                other != c.id and self.repo.descendant_of(other, c.id)
-                for other in ids
+                other != c.id and self.repo.descendant_of(other, c.id) for other in ids
             )
             if is_max:
                 maxima.append(c)
@@ -412,6 +410,7 @@ class Extractor:
 # ---------------------------------------------------------------------------
 # Stateless helpers
 # ---------------------------------------------------------------------------
+
 
 def _path_basename(p: str) -> str:
     return p.rsplit("/", 1)[-1]
@@ -434,11 +433,7 @@ def _is_locale_metadata_path(rel_path: str) -> bool:
       middle position rather than enforcing exactly two letters.
     """
     parts = rel_path.split("/")
-    return (
-        len(parts) == 3
-        and parts[0] == "by-locale"
-        and parts[2] == "metadata.json"
-    )
+    return len(parts) == 3 and parts[0] == "by-locale" and parts[2] == "metadata.json"
 
 
 def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
@@ -461,9 +456,7 @@ def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
             f"{type(obj).__name__}, not an object."
         )
     if "recommended" not in obj:
-        raise RuntimeError(
-            f"{rel_path}: JSON object has no 'recommended' key."
-        )
+        raise RuntimeError(f"{rel_path}: JSON object has no 'recommended' key.")
     normalized = {k: v for k, v in obj.items() if k != "recommended"}
     return json.dumps(normalized, sort_keys=True).encode("utf-8")
 
