@@ -1,0 +1,18 @@
+[project]
+name = "pytch-demo-catalogue-build-tool"
+version = "0.1.0"
+description = "Tool to turn git repo into dist/ folder ready for serving."
+authors = [
+    {name = "Ben North", email = "ben.north@tcd.ie"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pygit2 (>=1.19.2,<2.0.0)",
+    "click (>=8.3.3,<9.0.0)",
+    "colorlog (>=6.10.1,<7.0.0)",
+    "click-loglevel (>=0.7.0,<0.8.0)"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
