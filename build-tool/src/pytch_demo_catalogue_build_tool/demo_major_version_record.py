@@ -7,7 +7,7 @@ import zipfile
 
 import pygit2
 
-from .demo_catalogue_entry import CatalogueEntry
+from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from . import constants
 from .demo_locale_context import MultiLocaleDemo, LocaleContext
 from .repo_files import (
@@ -101,6 +101,16 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             locale_codes.append(name)
 
         return locale_codes
+
+    def index_contributions(self) -> list[IndexRecord]:
+        return (
+            []
+            if not self.is_latest
+            else [
+                (locale_code, self.catalogue_entry(locale_code))
+                for locale_code in self.locale_codes()
+            ]
+        )
 
     def locale_program_kind(self, locale_code: str) -> str:
         ctx = LocaleContext(self, locale_code)
