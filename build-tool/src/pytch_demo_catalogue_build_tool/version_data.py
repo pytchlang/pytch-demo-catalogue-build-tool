@@ -492,9 +492,3 @@ def main() -> None:
     records = Extractor(repo).demo_major_version_records()
     for r in records:
         r.write_dist_files(Path("/tmp/pytch-demos-dist-test"))
-
-
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    main()
