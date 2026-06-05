@@ -61,24 +61,6 @@ class DefiningCommit:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
-def main() -> None:
-    repo_path_arg = sys.argv[1] if len(sys.argv) > 1 else "."
-    discovered = pygit2.discover_repository(repo_path_arg)
-    if discovered is None:
-        sys.stderr.write(f"No git repository found at {repo_path_arg!r}\n")
-        sys.exit(1)
-    repo = pygit2.Repository(discovered)
-
-    output = Extractor(repo).results()
-    json.dump(output, sys.stdout, indent=2)
-    sys.stdout.write("\n")
-
-
-# ---------------------------------------------------------------------------
 # Extractor
 # ---------------------------------------------------------------------------
 
@@ -482,6 +464,24 @@ def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
         raise RuntimeError(f"{rel_path}: JSON object has no 'recommended' key.")
     normalized = {k: v for k, v in obj.items() if k != "recommended"}
     return json.dumps(normalized, sort_keys=True).encode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    repo_path_arg = sys.argv[1] if len(sys.argv) > 1 else "."
+    discovered = pygit2.discover_repository(repo_path_arg)
+    if discovered is None:
+        sys.stderr.write(f"No git repository found at {repo_path_arg!r}\n")
+        sys.exit(1)
+    repo = pygit2.Repository(discovered)
+
+    output = Extractor(repo).results()
+    json.dump(output, sys.stdout, indent=2)
+    sys.stdout.write("\n")
 
 
 # ---------------------------------------------------------------------------
