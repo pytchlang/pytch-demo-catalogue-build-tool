@@ -19,15 +19,19 @@ Each is a list of ``[uuid, value]`` pairs as described in the spec.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import hashlib
 import json
+from pathlib import Path
 import sys
 from typing import Any, Generator
 
 import pygit2
 
+from .constants import DistPaths
+from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
+from .demo_major_version_record import DemoMajorVersionRecord
 
 UUID_FILENAME = "pytch-demo-uuid.txt"
 
@@ -120,6 +124,19 @@ class Extractor:
                 for u in sorted_uuids
             ],
         }
+
+    def demo_major_version_records(self) -> list[DemoMajorVersionRecord]:
+        sorted_uuids = sorted(self.all_uuids)
+        return [
+            DemoMajorVersionRecord(
+                self.repo,
+                uuid,
+                self.chain_heads[uuid],
+                (demo_commit := self.defining_commits[uuid]).sha1,
+                Path(demo_commit.uuid_file_path).parent,
+            )
+            for uuid in sorted_uuids
+        ]
 
     # ---------------------------------------------------------------
     # Per-commit ingestion
@@ -461,25 +478,43 @@ def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
     return json.dumps(normalized, sort_keys=True).encode("utf-8")
 
 
+def gather_index_records(
+    dmv_records: list[DemoMajorVersionRecord],
+) -> dict[str, list[CatalogueEntry]]:
+    index_records: list[IndexRecord] = []
+    for r in dmv_records:
+        index_records.extend(r.index_contributions())
+
+    entries_by_locale: dict[str, list[CatalogueEntry]] = defaultdict(list)
+    for r in index_records:
+        entries_by_locale[r[0]].append(r[1])
+
+    for entries in entries_by_locale.values():
+        entries.sort(key=lambda entry: (entry.lastUpdated, entry.uuid), reverse=True)
+
+    return entries_by_locale
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    repo_path_arg = sys.argv[1] if len(sys.argv) > 1 else "."
-    discovered = pygit2.discover_repository(repo_path_arg)
+def main(repo_path: Path, dist_path: Path) -> None:
+    discovered = pygit2.discover_repository(repo_path)
     if discovered is None:
-        sys.stderr.write(f"No git repository found at {repo_path_arg!r}\n")
+        sys.stderr.write(f"No git repository found at {repo_path!r}\n")
         sys.exit(1)
     repo = pygit2.Repository(discovered)
 
-    output = Extractor(repo).results()
-    json.dump(output, sys.stdout, indent=2)
-    sys.stdout.write("\n")
+    records = Extractor(repo).demo_major_version_records()
+    for r in records:
+        r.write_dist_files(dist_path)
 
-
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    main()
+    index_entries_by_locale = gather_index_records(records)
+    for locale, index_entries in index_entries_by_locale.items():
+        locale_index_dir = dist_path / DistPaths.Index_Dir / locale
+        locale_index_dir.mkdir(parents=True, exist_ok=True)
+        with (locale_index_dir / DistPaths.Index_File).open("wt") as f_index:
+            locale_index_dicts = [asdict(entry) for entry in index_entries]
+            json.dump(locale_index_dicts, f_index, indent=2)
