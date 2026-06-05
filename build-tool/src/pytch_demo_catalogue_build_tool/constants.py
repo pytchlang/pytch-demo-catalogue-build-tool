@@ -14,3 +14,37 @@ def _extensions_for_major_type(mime_major_type: str) -> list[str]:
 
 image_extensions = _extensions_for_major_type("image")
 video_extensions = _extensions_for_major_type("video")
+
+
+class DemoRepoPaths:
+    # File within this repo containing the UUID of a demo.  As well as
+    # the contents giving the UUID, the presence of this file marks the
+    # directory as containing a demo.
+    Uuid_File = Path("pytch-demo-uuid.txt")
+
+    # Demo-global metadata, stored directly at top level within the
+    # demo's directory.
+    Global_Metadata_File = Path("metadata.json")
+
+    # Subdirectory containing one subdirectory per locale.
+    Locales_Dir = Path("by-locale")
+
+    class LocaleContent:
+        # The thumbnail image and video both have this stem, with the
+        # extension determining whether image or video.
+        Thumbnail_Stem = "thumbnail"
+
+        # Metadata.
+        Metadata_File = Path("metadata.json")
+
+        # Content.
+        Content_Dir = Path("content")
+
+        # Short (summary) markdown.
+        Summary_File = Path("summary.md")
+
+        # Long description markdown.
+        Description_File = Path("description.md")
+
+        # Extracted Pytch Zipfile contents.
+        Project_Dir = Path("project")
