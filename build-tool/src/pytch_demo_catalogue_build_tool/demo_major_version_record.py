@@ -4,6 +4,7 @@ from typing import Any
 
 import pygit2
 
+from .demo_catalogue_entry import CatalogueEntry
 from . import constants
 from .demo_locale_context import MultiLocaleDemo, LocaleContext
 from .repo_files import (
@@ -125,3 +126,40 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     def global_metadata(self) -> dict[str, Any]:
         path = self.demo_root_path / constants.DemoRepoPaths.Global_Metadata_File
         return self.json_dict_within_commit(path)
+
+    def catalogue_entry(self, locale_code: str) -> CatalogueEntry:
+        ctx = LocaleContext(self, locale_code)
+
+        ZipfileMetadataKeys = constants.PytchZipfileMetadataKeys
+        display_name = ctx.project_metadata[ZipfileMetadataKeys.Project_Name]
+
+        modify_time = self.commit.author.time
+        last_updated = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(modify_time))
+
+        summary_markdown = self.text_within_commit(ctx.repo_summary_path)
+
+        global_metadata = self.global_metadata
+        author_name = global_metadata[constants.DemoMetadataKeys.Author_Name]
+        demo_kind = global_metadata[constants.DemoMetadataKeys.Demo_Kind]
+
+        recommended = ctx.metadata[constants.DemoMetadataKeys.Is_Recommended]
+
+        program_kind = self.common_program_kind()
+
+        thumbnail_image_extension = ctx.thumb_image_path.suffix
+        m_thumb_vid_path = ctx.maybe_thumb_video_path
+        thumbnail_video_extension = m_thumb_vid_path and m_thumb_vid_path.suffix
+
+        return CatalogueEntry(
+            self.uuid,
+            display_name,
+            author_name,
+            program_kind,
+            demo_kind,
+            summary_markdown,
+            last_updated,
+            recommended,
+            thumbnail_image_extension,
+            thumbnail_video_extension,
+            self.latest_uuid,
+        )
