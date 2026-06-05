@@ -117,3 +117,21 @@ class PytchZipfilePaths:
         Code_File,
         Assets_Metadata_File,
     ]
+
+
+class PytchZipfileMetadataKeys:
+    """
+    Keys used within top-level Pytch Zipfile project metadata.
+    """
+
+    Project_Name = "projectName"
+    Linked_Content_Ref = "linkedContentRef"
+
+
+class PytchZipfileMetadataValues:
+    """
+    Well-known values used for Pytch Zipfile project metadata entries.
+    """
+
+    class LinkedContentRef:
+        No_Linked_Content = {"kind": "none"}
