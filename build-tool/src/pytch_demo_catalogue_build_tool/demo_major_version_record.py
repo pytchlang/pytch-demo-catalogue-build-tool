@@ -5,7 +5,7 @@ from typing import Any
 import pygit2
 
 from . import constants
-from .demo_locale_context import MultiLocaleDemo
+from .demo_locale_context import MultiLocaleDemo, LocaleContext
 from .repo_files import (
     name_of_tree_entry,
     file_within_commit,
@@ -97,3 +97,15 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             locale_codes.append(name)
 
         return locale_codes
+
+    def locale_program_kind(self, locale_code: str) -> str:
+        ctx = LocaleContext(self, locale_code)
+        code_path = ctx.repo_project_path / constants.PytchZipfilePaths.Code_File
+        code_obj = self.json_dict_within_commit(code_path)
+        kind_obj = code_obj[constants.PytchZipfileCodeKeys.Program_Kind]
+        if not isinstance(kind_obj, str):
+            raise RuntimeError(
+                f'program-kind in "{code_path}" within tree of'
+                f" commit {self.defining_commit_id} is not a string"
+            )
+        return kind_obj
