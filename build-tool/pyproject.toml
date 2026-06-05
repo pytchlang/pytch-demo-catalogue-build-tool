@@ -13,6 +13,9 @@ dependencies = [
     "click-loglevel (>=0.7.0,<0.8.0)"
 ]
 
+[project.scripts]
+build-dist = "pytch_demo_catalogue_build_tool.cli:build_dist"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
