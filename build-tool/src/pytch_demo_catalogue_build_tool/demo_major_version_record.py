@@ -163,3 +163,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             thumbnail_video_extension,
             self.latest_uuid,
         )
+
+    def copy_file(self, repo_path: Path, dist_path: Path) -> None:
+        data = self.file_within_commit(repo_path)
+        dist_path.write_bytes(data)
