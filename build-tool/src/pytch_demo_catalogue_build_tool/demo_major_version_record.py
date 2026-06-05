@@ -1,6 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+import json
 from pathlib import Path
+import time
 from typing import Any
+import zipfile
 
 import pygit2
 
@@ -167,3 +170,77 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     def copy_file(self, repo_path: Path, dist_path: Path) -> None:
         data = self.file_within_commit(repo_path)
         dist_path.write_bytes(data)
+
+    def write_locale_dist_files(self, dist_demo_root: Path, locale_code: str) -> None:
+        """
+        Write files within the directory
+
+        * `${DIST_ROOT}/${DEMO_UUID}/${locale_code}`
+
+        where we are given
+
+        * `dist_demo_root = ${DIST_ROOT}/${DEMO_UUID}`
+
+        Relative to `${dist_demo_root}/${locale_code}`, we write:
+
+        ```
+            metadata.json
+            project.zip (**)
+            content/
+                description.md
+                summary.md
+                thumbnail.jpg (**)
+                thumbnail.mp4 (**)
+        ```
+
+        where the files marked (**) are only included if `self` is the
+        "current major version" of a particular demo.
+
+        This is fiddly but not complicated.
+        """
+        ctx = LocaleContext(self, locale_code)
+        LocaleContent = constants.DistPaths.LocaleContent
+
+        # Create directory structure within dist dir.
+        dist_locale_root_dir = dist_demo_root / locale_code
+        dist_content_dir = dist_locale_root_dir / LocaleContent.Content_Dir
+        dist_content_dir.mkdir(parents=True, exist_ok=True)
+
+        # Compute and write locale-specific metadata file.
+        dist_metadata_path = dist_locale_root_dir / LocaleContent.Metadata_File
+        catalogue_entry = self.catalogue_entry(locale_code)
+        catalogue_entry_json = json.dumps(asdict(catalogue_entry), indent=2)
+        dist_metadata_path.write_text(catalogue_entry_json)
+
+        # Copy "description" and "summary" markdown files.
+        description_path = dist_content_dir / LocaleContent.Description_File
+        description_path.write_bytes(ctx.repo_description_data)
+        summary_path = dist_content_dir / LocaleContent.Summary_File
+        summary_path.write_bytes(ctx.repo_summary_data)
+
+        # TODO: Assets used in "description" markdown.
+
+        if self.is_latest:
+            # Also need thumbnails and project zipfile.
+
+            # Thumbnail image.
+            thumb_img_basename = catalogue_entry.thumb_image_basename
+            thumb_img_repo_path = ctx.repo_content_dir_path / thumb_img_basename
+            thumb_img_dist_path = dist_content_dir / thumb_img_basename
+            self.copy_file(thumb_img_repo_path, thumb_img_dist_path)
+
+            # Thumbnail video, if there is one.
+            thumb_vid_basename = catalogue_entry.maybe_thumb_video_basename
+            if thumb_vid_basename is not None:
+                thumb_vid_repo_path = ctx.repo_content_dir_path / thumb_vid_basename
+                thumb_vid_dist_path = dist_content_dir / thumb_vid_basename
+                self.copy_file(thumb_vid_repo_path, thumb_vid_dist_path)
+
+            # Project zipfile.
+            dist_zipfile_path = dist_demo_root / ctx.dist_rel_zipfile_path
+            with dist_zipfile_path.open("wb") as f_zip:
+                with zipfile.ZipFile(f_zip, "w") as zip:
+                    for rel_path in ctx.repo_project_relative_paths:
+                        repo_path = ctx.repo_project_path / rel_path
+                        repo_data = self.file_within_commit(repo_path)
+                        zip.writestr(str(rel_path), repo_data)
