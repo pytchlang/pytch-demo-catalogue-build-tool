@@ -54,3 +54,32 @@ class DemoMetadataKeys:
     Author_Name = "authorName"
     Demo_Kind = "demoKind"
     Is_Recommended = "recommended"
+
+
+class DistPaths:
+    """
+    Paths for files and directories to be written within the `dist/`
+    directory.
+    """
+
+    # Top-level directory containing the by-locale index JSON files.
+    Index_Dir = Path("index")
+
+    # File within the by-locale subdirectory of the index directory.
+    Index_File = Path("demos.json")
+
+    class LocaleContent:
+        # Metadata.
+        Metadata_File = DemoRepoPaths.LocaleContent.Metadata_File
+
+        # Content.
+        Content_Dir = DemoRepoPaths.LocaleContent.Content_Dir
+
+        # Short (summary) markdown.
+        Summary_File = DemoRepoPaths.LocaleContent.Summary_File
+
+        # Long description markdown.
+        Description_File = DemoRepoPaths.LocaleContent.Description_File
+
+        # Project zipfile.
+        Zipfile_File = Path("project.zip")
