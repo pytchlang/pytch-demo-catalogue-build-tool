@@ -89,3 +89,16 @@ def _thumbnail_with_extension(
         )
 
     return found_path
+
+
+def thumbnail_with_extension(
+    repo: pygit2.Repository,
+    commit_id: str,
+    dir: Path,
+    kind_label: str,
+    extensions: list[str],
+) -> Path:
+    thumbnail_path = _thumbnail_with_extension(
+        repo, commit_id, dir, kind_label, True, extensions
+    )
+    return thumbnail_path  # type: ignore
