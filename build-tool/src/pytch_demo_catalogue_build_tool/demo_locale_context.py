@@ -125,3 +125,19 @@ class LocaleContext:
 
     def json_list(self, path: Path) -> list[Any]:
         return self.demo.json_list_within_commit(path)
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self.json_obj(self.repo_metadata_path)
+
+    @property
+    def repo_summary_data(self) -> bytes:
+        return self.demo.file_within_commit(self.repo_summary_path)
+
+    @property
+    def repo_description_data(self) -> bytes:
+        return self.demo.file_within_commit(self.repo_description_path)
+
+    @property
+    def project_metadata(self) -> dict[str, Any]:
+        return self.json_obj(self.repo_project_metadata_path)
