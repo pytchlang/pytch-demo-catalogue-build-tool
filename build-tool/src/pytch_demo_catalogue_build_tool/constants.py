@@ -48,3 +48,9 @@ class DemoRepoPaths:
 
         # Extracted Pytch Zipfile contents.
         Project_Dir = Path("project")
+
+
+class DemoMetadataKeys:
+    Author_Name = "authorName"
+    Demo_Kind = "demoKind"
+    Is_Recommended = "recommended"
