@@ -7,6 +7,7 @@ import pygit2
 from . import constants
 from .demo_locale_context import MultiLocaleDemo
 from .repo_files import (
+    name_of_tree_entry,
     file_within_commit,
     json_within_commit,
     text_within_commit,
@@ -74,3 +75,25 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
 
     def text_within_commit(self, path: Path) -> str:
         return text_within_commit(self.repo, self.defining_commit_id, path)
+
+    def locale_codes(self) -> list[str]:
+        locales_path = str(self.demo_root_path / constants.DemoRepoPaths.Locales_Dir)
+        locales_dir_obj = self.tree / locales_path
+        if locales_dir_obj.type_str != "tree":
+            raise RuntimeError(
+                f'"{locales_path}" is not a tree within tree of'
+                f" commit {self.defining_commit_id}"
+            )
+
+        locales_dir: pygit2.Tree = locales_dir_obj  # type: ignore
+        locale_codes: list[str] = []
+        for entry in locales_dir:
+            name = name_of_tree_entry(entry)
+            if entry.type_str != "tree":
+                raise RuntimeError(
+                    f'"{name}" is not a tree in {locales_path}'
+                    f" within tree of commit {self.defining_commit_id}"
+                )
+            locale_codes.append(name)
+
+        return locale_codes
