@@ -119,3 +119,9 @@ class LocaleContext:
             for record in asset_records
         ]
         return constants.PytchZipfilePaths.Fixed_Files + asset_files
+
+    def json_obj(self, path: Path) -> dict[str, Any]:
+        return self.demo.json_dict_within_commit(path)
+
+    def json_list(self, path: Path) -> list[Any]:
+        return self.demo.json_list_within_commit(path)
