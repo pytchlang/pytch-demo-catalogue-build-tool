@@ -143,3 +143,11 @@ class PytchZipfileCodeKeys:
     """
 
     Program_Kind = "kind"
+
+
+class PytchZipfileAssetMetadataKeys:
+    """
+    Keys used within assets metadata of a Pytch Zipfile.
+    """
+
+    Filename = "name"
