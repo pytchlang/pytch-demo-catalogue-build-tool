@@ -244,3 +244,9 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                         repo_path = ctx.repo_project_path / rel_path
                         repo_data = self.file_within_commit(repo_path)
                         zip.writestr(str(rel_path), repo_data)
+
+    def write_dist_files(self, dist_root: Path) -> None:
+        dist_dir = dist_root / self.uuid
+        dist_dir.mkdir(parents=True, exist_ok=True)
+        for locale_code in self.locale_codes():
+            self.write_locale_dist_files(dist_dir, locale_code)
