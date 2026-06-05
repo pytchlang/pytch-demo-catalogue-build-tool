@@ -28,6 +28,7 @@ from typing import Any, Generator
 
 import pygit2
 
+from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
 
@@ -474,6 +475,23 @@ def _normalize_locale_metadata(rel_path: str, data: bytes) -> bytes:
         raise RuntimeError(f"{rel_path}: JSON object has no 'recommended' key.")
     normalized = {k: v for k, v in obj.items() if k != "recommended"}
     return json.dumps(normalized, sort_keys=True).encode("utf-8")
+
+
+def gather_index_records(
+    dmv_records: list[DemoMajorVersionRecord],
+) -> dict[str, list[CatalogueEntry]]:
+    index_records: list[IndexRecord] = []
+    for r in dmv_records:
+        index_records.extend(r.index_contributions())
+
+    entries_by_locale: dict[str, list[CatalogueEntry]] = defaultdict(list)
+    for r in index_records:
+        entries_by_locale[r[0]].append(r[1])
+
+    for entries in entries_by_locale.values():
+        entries.sort(key=lambda entry: (entry.lastUpdated, entry.uuid), reverse=True)
+
+    return entries_by_locale
 
 
 # ---------------------------------------------------------------------------
