@@ -40,3 +40,8 @@ def tree_entry_within_commit(
 def file_within_commit(repo: pygit2.Repository, commit_id: str, path: Path) -> bytes:
     blob: pygit2.Blob = tree_entry_within_commit(repo, commit_id, path, "blob")  # type: ignore
     return blob.data
+
+
+def text_within_commit(repo: pygit2.Repository, commit_id: str, path: Path) -> str:
+    data = file_within_commit(repo, commit_id, path)
+    return data.decode("utf-8")
