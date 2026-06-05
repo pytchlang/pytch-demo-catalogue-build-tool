@@ -120,3 +120,8 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                 f" of commit {self.defining_commit_id}"
             )
         return program_kinds.pop()
+
+    @property
+    def global_metadata(self) -> dict[str, Any]:
+        path = self.demo_root_path / constants.DemoRepoPaths.Global_Metadata_File
+        return self.json_dict_within_commit(path)
