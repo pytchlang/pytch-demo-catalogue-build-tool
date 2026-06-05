@@ -22,12 +22,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 import hashlib
 import json
+from pathlib import Path
 import sys
 from typing import Any, Generator
 
 import pygit2
 
 from .repo_files import name_of_tree_entry
+from .demo_major_version_record import DemoMajorVersionRecord
 
 UUID_FILENAME = "pytch-demo-uuid.txt"
 
@@ -120,6 +122,19 @@ class Extractor:
                 for u in sorted_uuids
             ],
         }
+
+    def demo_major_version_records(self) -> list[DemoMajorVersionRecord]:
+        sorted_uuids = sorted(self.all_uuids)
+        return [
+            DemoMajorVersionRecord(
+                self.repo,
+                uuid,
+                self.chain_heads[uuid],
+                (demo_commit := self.defining_commits[uuid]).sha1,
+                Path(demo_commit.uuid_file_path).parent,
+            )
+            for uuid in sorted_uuids
+        ]
 
     # ---------------------------------------------------------------
     # Per-commit ingestion
