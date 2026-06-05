@@ -109,3 +109,14 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                 f" commit {self.defining_commit_id} is not a string"
             )
         return kind_obj
+
+    def common_program_kind(self) -> str:
+        program_kinds = set(map(self.locale_program_kind, self.locale_codes()))
+        n_kinds = len(program_kinds)
+        if n_kinds != 1:
+            raise RuntimeError(
+                f"found {n_kinds} distinct program-kind values"
+                f' for "{self.demo_root_path}" within tree'
+                f" of commit {self.defining_commit_id}"
+            )
+        return program_kinds.pop()
