@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,3 +27,9 @@ class MultiLocaleDemo(ABC):
 
     @abstractmethod
     def file_within_commit(self, path: Path) -> bytes: ...
+
+
+@dataclass
+class LocaleContext:
+    demo: MultiLocaleDemo
+    locale_code: str
