@@ -17,13 +17,13 @@ Each is a list of ``[uuid, value]`` pairs as described in the spec.
 """
 
 from __future__ import annotations
-from typing import Any, Generator
 
+from collections import defaultdict
+from dataclasses import dataclass
 import hashlib
 import json
 import sys
-from collections import defaultdict
-from dataclasses import dataclass
+from typing import Any, Generator
 
 import pygit2
 
