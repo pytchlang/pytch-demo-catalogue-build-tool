@@ -251,7 +251,7 @@ class Extractor:
 
                 blob: pygit2.Blob = entry  # type: ignore
 
-                # The recommended flag is ignored data, so we must read
+                # The "recommended" flag is ignored data, so we must read
                 # the blob, normalize it, and hash the normalized bytes.
                 data = _normalize_locale_metadata(rel, blob.data)
                 h.update(b"\x00B")
