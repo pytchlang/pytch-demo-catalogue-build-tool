@@ -100,9 +100,8 @@ class Extractor:
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
         self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
 
-        assert (
-            self.defining_commits.keys() == self.all_uuids
-        ), "Internal invariant violated: not every UUID has a defining commit."
+        if self.defining_commits.keys() != self.all_uuids:
+            raise AssertionError("not every UUID has a defining commit")
 
     # ---------------------------------------------------------------
     # Formatting
@@ -343,10 +342,9 @@ class Extractor:
             # HEAD's ancestry (collected by _iter_demos), and the commit
             # that first introduces it is necessarily a modification
             # commit, so mod_commits[uuid] is non-empty.
-            assert candidates, (
-                f"Internal invariant violated: no modification commit found "
-                f"for UUID {uuid}."
-            )
+            if not candidates:
+                raise AssertionError(f"no modification commit found for UUID {uuid}")
+
             maxima = self._topological_maxima(candidates)
             if len(maxima) > 1:
                 # Interpretation note: the spec says the *state* must be
