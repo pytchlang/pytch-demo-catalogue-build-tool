@@ -37,3 +37,6 @@ class CatalogueEntry:
                 + self.thumbnailVideoExtension
             )
         )
+
+
+type IndexRecord = tuple[str, CatalogueEntry]
