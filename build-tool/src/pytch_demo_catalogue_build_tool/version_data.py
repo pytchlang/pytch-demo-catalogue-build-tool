@@ -489,9 +489,9 @@ def main() -> None:
         sys.exit(1)
     repo = pygit2.Repository(discovered)
 
-    output = Extractor(repo).results()
-    json.dump(output, sys.stdout, indent=2)
-    sys.stdout.write("\n")
+    records = Extractor(repo).demo_major_version_records()
+    for r in records:
+        r.write_dist_files(Path("/tmp/pytch-demos-dist-test"))
 
 
 # ---------------------------------------------------------------------------
