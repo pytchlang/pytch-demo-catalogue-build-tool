@@ -135,3 +135,11 @@ class PytchZipfileMetadataValues:
 
     class LinkedContentRef:
         No_Linked_Content = {"kind": "none"}
+
+
+class PytchZipfileCodeKeys:
+    """
+    Keys used within Pytch Zipfile project code JSON file.
+    """
+
+    Program_Kind = "kind"
