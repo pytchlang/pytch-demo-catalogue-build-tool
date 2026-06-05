@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Optional
 
 import pygit2
 
@@ -55,3 +56,36 @@ def json_within_commit(
 ) -> constants.JsonThing:
     json_data = file_within_commit(repo, commit_id, path)
     return json.loads(json_data)
+
+
+def _thumbnail_with_extension(
+    repo: pygit2.Repository,
+    commit_id: str,
+    dir: Path,
+    kind_label: str,
+    required: bool,
+    extensions: list[str],
+) -> Optional[Path]:
+    tree_obj: pygit2.Tree = tree_entry_within_commit(repo, commit_id, dir, "tree")  # type: ignore
+
+    found_path = None
+    for candidate in tree_obj:
+        candidate_path = Path(name_of_tree_entry(candidate))
+        if (
+            candidate_path.stem == constants.DemoRepoPaths.LocaleContent.Thumbnail_Stem
+            and candidate_path.suffix in extensions
+        ):
+            if found_path is not None:
+                raise RuntimeError(
+                    f'found multiple {kind_label} thumbnails in "{dir}"'
+                    f" within tree of {commit_id}"
+                )
+            found_path = candidate_path
+
+    if found_path is None and required:
+        raise RuntimeError(
+            f'found no {kind_label} thumbnails in "{dir}"'
+            f" within tree of {commit_id}"
+        )
+
+    return found_path
