@@ -19,7 +19,7 @@ Each is a list of ``[uuid, value]`` pairs as described in the spec.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import hashlib
 import json
 from pathlib import Path
@@ -28,6 +28,7 @@ from typing import Any, Generator
 
 import pygit2
 
+from .constants import DistPaths
 from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
@@ -509,3 +510,11 @@ def main(repo_path: Path, dist_path: Path) -> None:
     records = Extractor(repo).demo_major_version_records()
     for r in records:
         r.write_dist_files(dist_path)
+
+    index_entries_by_locale = gather_index_records(records)
+    for locale, index_entries in index_entries_by_locale.items():
+        locale_index_dir = dist_path / DistPaths.Index_Dir / locale
+        locale_index_dir.mkdir(parents=True, exist_ok=True)
+        with (locale_index_dir / DistPaths.Index_File).open("wt") as f_index:
+            locale_index_dicts = [asdict(entry) for entry in index_entries]
+            json.dump(locale_index_dicts, f_index, indent=2)
