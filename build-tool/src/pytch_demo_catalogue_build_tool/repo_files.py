@@ -35,3 +35,8 @@ def tree_entry_within_commit(
         entry = next_entry  # type: ignore
 
     return entry  # type: ignore
+
+
+def file_within_commit(repo: pygit2.Repository, commit_id: str, path: Path) -> bytes:
+    blob: pygit2.Blob = tree_entry_within_commit(repo, commit_id, path, "blob")  # type: ignore
+    return blob.data
