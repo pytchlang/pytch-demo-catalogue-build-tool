@@ -1,7 +1,10 @@
 import mimetypes
 from pathlib import Path
+from typing import Any
 
 mimetypes.init()
+
+type JsonThing = dict[str, Any] | list[Any]
 
 
 def _extensions_for_major_type(mime_major_type: str) -> list[str]:
