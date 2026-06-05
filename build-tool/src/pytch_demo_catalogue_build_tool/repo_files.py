@@ -1,6 +1,9 @@
+import json
 from pathlib import Path
 
 import pygit2
+
+from . import constants
 
 
 def name_of_tree_entry(entry: pygit2.Object) -> str:
@@ -45,3 +48,10 @@ def file_within_commit(repo: pygit2.Repository, commit_id: str, path: Path) -> b
 def text_within_commit(repo: pygit2.Repository, commit_id: str, path: Path) -> str:
     data = file_within_commit(repo, commit_id, path)
     return data.decode("utf-8")
+
+
+def json_within_commit(
+    repo: pygit2.Repository, commit_id: str, path: Path
+) -> constants.JsonThing:
+    json_data = file_within_commit(repo, commit_id, path)
+    return json.loads(json_data)
