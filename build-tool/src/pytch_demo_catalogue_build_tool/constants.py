@@ -83,3 +83,37 @@ class DistPaths:
 
         # Project zipfile.
         Zipfile_File = Path("project.zip")
+
+
+class PytchZipfilePaths:
+    """
+    Paths for files and directories containing information within an
+    extracted Pytch zipfile.  All paths are relative to the root of the
+    project tree.
+    """
+
+    # Overall metadata for the project.
+    Project_Metadata_File = Path("meta.json")
+
+    # Zipfile version information.
+    Version_File = Path("version.json")
+
+    # Project code (either structured or flat).
+    Code_File = Path("code") / Path("code.json")
+
+    # Asset information (files and metadata).
+    Assets_Dir = Path("assets")
+
+    # Asset files themselves.
+    Asset_Files_Dir = Assets_Dir / Path("files")
+
+    # Metadata for assets.
+    Assets_Metadata_File = Assets_Dir / Path("metadata.json")
+
+    # All files which are always present in a Pytch Zipfile.
+    Fixed_Files = [
+        Version_File,
+        Project_Metadata_File,
+        Code_File,
+        Assets_Metadata_File,
+    ]
