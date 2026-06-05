@@ -27,6 +27,8 @@ from typing import Any, Generator
 
 import pygit2
 
+from .repo_files import name_of_tree_entry
+
 UUID_FILENAME = "pytch-demo-uuid.txt"
 
 
@@ -214,11 +216,6 @@ class Extractor:
         h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
         prefix: str,
     ):
-        def name_of_tree_entry(entry: pygit2.Object) -> str:
-            if entry.name is None:
-                raise RuntimeError(f"Object {entry.id} has no name")
-            return entry.name
-
         for entry in sorted(tree, key=name_of_tree_entry):
             rel = f"{prefix}/{entry.name}" if prefix else name_of_tree_entry(entry)
             h.update(b"\x00P")
