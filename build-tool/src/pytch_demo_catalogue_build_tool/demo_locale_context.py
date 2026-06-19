@@ -131,10 +131,6 @@ class LocaleContext:
         return self.json_obj(self.repo_metadata_path)
 
     @property
-    def repo_summary_data(self) -> bytes:
-        return self.demo.file_within_commit(self.repo_summary_path)
-
-    @property
     def repo_description_data(self) -> bytes:
         return self.demo.file_within_commit(self.repo_description_path)
 
