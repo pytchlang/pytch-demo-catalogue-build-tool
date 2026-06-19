@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 import json
 from pathlib import Path
 import time
-from typing import Any
+from typing import Any, Optional
 import zipfile
 
 import pygit2
@@ -22,7 +22,7 @@ from .repo_files import (
 class DemoMajorVersionRecord(MultiLocaleDemo):
     _repo: pygit2.Repository
     uuid: str
-    latest_uuid: str
+    latest_uuid: Optional[str]
     _defining_commit_id: str
     _demo_root_path: Path
     _present_at_head: bool
