@@ -40,10 +40,6 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         return self._demo_root_path
 
     @property
-    def is_latest(self) -> bool:
-        return self.uuid == self.latest_uuid
-
-    @property
     def present_at_head(self) -> bool:
         """True iff this demo-major-version exists in HEAD's tree.
 
