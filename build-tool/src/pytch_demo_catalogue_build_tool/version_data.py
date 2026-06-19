@@ -144,6 +144,18 @@ class Extractor:
             for uuid in sorted_uuids
         ]
 
+    def _latest_uuid(self, uuid: str) -> str | None:
+        """The live major-version this demo should point users to.
+
+        The head of the chain is the most recent major version.  If that
+        head is still present in HEAD's tree it is the live version (and a
+        live demo points to itself).  If the head is absent, the whole
+        chain has been deleted and there is no version to upgrade to, so
+        the latest uuid is None (null when exported).
+        """
+        head = self.chain_heads[uuid]
+        return head if head in self.head_uuids else None
+
     # ---------------------------------------------------------------
     # Per-commit ingestion
     # ---------------------------------------------------------------
