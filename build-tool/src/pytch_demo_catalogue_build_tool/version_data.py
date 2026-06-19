@@ -136,7 +136,7 @@ class Extractor:
             DemoMajorVersionRecord(
                 self.repo,
                 uuid,
-                self.chain_heads[uuid],
+                self._latest_uuid(uuid),
                 (demo_commit := self.defining_commits[uuid]).sha1,
                 Path(demo_commit.uuid_file_path).parent,
                 uuid in self.head_uuids,
