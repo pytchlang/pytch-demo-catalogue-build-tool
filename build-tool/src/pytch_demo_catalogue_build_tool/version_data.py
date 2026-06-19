@@ -139,6 +139,7 @@ class Extractor:
                 self.chain_heads[uuid],
                 (demo_commit := self.defining_commits[uuid]).sha1,
                 Path(demo_commit.uuid_file_path).parent,
+                uuid in self.head_uuids,
             )
             for uuid in sorted_uuids
         ]
