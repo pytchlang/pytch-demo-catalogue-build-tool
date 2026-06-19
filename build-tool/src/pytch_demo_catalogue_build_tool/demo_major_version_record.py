@@ -25,6 +25,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     latest_uuid: str
     _defining_commit_id: str
     _demo_root_path: Path
+    _present_at_head: bool
 
     @property
     def repo(self) -> pygit2.Repository:
@@ -41,6 +42,18 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     @property
     def is_latest(self) -> bool:
         return self.uuid == self.latest_uuid
+
+    @property
+    def present_at_head(self) -> bool:
+        """True iff this demo-major-version exists in HEAD's tree.
+
+        This is the test for whether the demo is currently
+        discoverable: deleted demos survive in the history (and so
+        still have their explanatory content written out for extant
+        linked projects) but do not appear in the index, and do not
+        have a fresh project zip or thumbnails written.
+        """
+        return self._present_at_head
 
     @property
     def commit(self) -> pygit2.Commit:
