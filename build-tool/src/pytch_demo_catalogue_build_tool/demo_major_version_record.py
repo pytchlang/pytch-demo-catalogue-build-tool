@@ -118,7 +118,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     def index_contributions(self) -> list[IndexRecord]:
         return (
             []
-            if not self.is_latest
+            if not self.present_at_head
             else [
                 (locale_code, self.catalogue_entry(locale_code))
                 for locale_code in self.locale_codes()
