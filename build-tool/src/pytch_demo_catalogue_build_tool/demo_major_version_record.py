@@ -243,7 +243,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
 
         # TODO: Assets used in "description" markdown.
 
-        if self.is_latest:
+        if self.present_at_head:
             # Also need thumbnails and project zipfile.
 
             # Thumbnail image.
