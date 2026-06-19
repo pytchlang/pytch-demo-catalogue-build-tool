@@ -174,12 +174,15 @@ types:
   be `null`.  **Source:** Computed by build tool by looking at what
   video file exists, if any, in the repo.
 
-* `latestUuid: string` — **Work in progress.** The uuid of the latest
-  release of this demo.  Not yet implemented.  Idea is that if we
-  significantly update a demo, it would be useful to show a message
-  along the lines of "There is a newer version of this demo available.
-  Click here to create a project linked to it.".  **Source:** Will be
-  computed from git history.
+* `latestUuid: string | null` — The uuid of the latest release of this
+  demo.  If we significantly update a demo (a new "major version"),
+  this lets the front end show a message along the lines of "There is
+  a newer version of this demo available.  Click here to create a
+  project linked to it.".  A live demo points to itself.  If the demo
+  has been deleted (i.e., the head of its major-version chain is no
+  longer present in the repo), there is no live version to upgrade to
+  and this is `null`.  **Source:** Computed by the build tool from git
+  history.
 
 This type is represented in the Python tool here (see below) as the
 type `CatalogueEntry`.  In the front-end, the zod object is
