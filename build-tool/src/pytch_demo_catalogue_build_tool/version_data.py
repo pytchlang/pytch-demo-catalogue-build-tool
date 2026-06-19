@@ -103,6 +103,11 @@ class Extractor:
         for commit in self.head_ancestry:
             self._scan_commit(commit)
 
+        # A demo-major-version is "current" / discoverable iff its UUID is
+        # present in HEAD's own tree.
+        head_commit = self.repo[self.repo.head.target]
+        self.head_uuids: set[str] = set(self.commit_demos[head_commit.id].keys())
+
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
         self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
 
