@@ -207,7 +207,6 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             project.zip (**)
             content/
                 description.md
-                summary.md
                 thumbnail.jpg (**)
                 thumbnail.mp4 (**)
         ```
@@ -234,8 +233,6 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         # Copy "description" and "summary" markdown files.
         description_path = dist_content_dir / LocaleContent.Description_File
         description_path.write_bytes(ctx.repo_description_data)
-        summary_path = dist_content_dir / LocaleContent.Summary_File
-        summary_path.write_bytes(ctx.repo_summary_data)
 
         # TODO: Assets used in "description" markdown.
 
