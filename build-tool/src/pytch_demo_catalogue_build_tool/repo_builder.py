@@ -29,6 +29,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+from uuid import UUID, uuid5
 
 import click
 import pygit2
@@ -142,6 +143,10 @@ class FileState:
         )
 
         project = _load_project_template(spec.program_kind, spec.uuid)
+        if spec.display_name is not None:
+            meta = json.loads(project["meta.json"])
+            meta["projectName"] = spec.display_name
+            project["meta.json"] = _json(meta)
         for locale in spec.locales:
             base = f"by-locale/{locale}"
             put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
@@ -239,6 +244,9 @@ class DemoSpec:
     author_name: str
     demo_kind: str
     program_kind: str
+    # When set, overrides the project template's projectName (the demo's
+    # displayName); otherwise the template's own value is kept.
+    display_name: Optional[str] = None
 
 
 @dataclass
@@ -248,6 +256,7 @@ class History:
     uuids: dict[str, str]
     commits: list[dict[str, Any]]
     scenarios: list[dict[str, Any]] = field(default_factory=list)
+    bulk: Optional[dict[str, Any]] = None
 
     def uuid(self, alias_or_literal: Optional[str]) -> Optional[str]:
         """Resolve an alias to its uuid; ``None`` and literals pass through."""
@@ -260,11 +269,83 @@ def load_history(path: Path) -> History:
     raw = yaml.safe_load(path.read_text())
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: top-level YAML is not a mapping")
-    return History(
+    history = History(
         uuids=raw["uuids"],
         commits=raw["commits"],
         scenarios=raw["scenarios"],
+        bulk=raw.get("bulk"),
     )
+    if history.bulk is not None:
+        history.commits.extend(_expand_bulk(history.bulk))
+    return history
+
+
+# A fixed namespace so bulk demo uuids are stable across runs (the dist is
+# also a front-end fixture, so its uuids must not move commit to commit).
+BULK_UUID_NAMESPACE = UUID("6f3b9c1e-0d2a-4e7f-9a18-2c5d4b6e8f01")
+
+
+# How many demos at the start of each category are flagged recommended.
+BULK_RECOMMENDED_PER_CATEGORY = 2
+
+
+def bulk_demos(bulk: dict[str, Any]) -> list[dict[str, Any]]:
+    """The demos a bulk section expands to, one dict each.
+
+    Each carries its programKind, demoKind, demo-directory name, derived
+    uuid, a distinct displayName, and whether it is recommended (the first
+    ``BULK_RECOMMENDED_PER_CATEGORY`` of every category).  Exposed so tests
+    can predict the generated demos."""
+    demos: list[dict[str, Any]] = []
+    for program_kind in bulk["programKinds"]:
+        for demo_kind in bulk["demoKinds"]:
+            for i in range(bulk["count"]):
+                name = f"{program_kind}-{demo_kind}-{i:02d}"
+                demos.append(
+                    {
+                        "program_kind": program_kind,
+                        "demo_kind": demo_kind,
+                        "name": name,
+                        "uuid": str(uuid5(BULK_UUID_NAMESPACE, name)),
+                        "display_name": f"{program_kind} {demo_kind} demo {i:02d}",
+                        "recommended": i < BULK_RECOMMENDED_PER_CATEGORY,
+                    }
+                )
+    return demos
+
+
+def _expand_bulk(bulk: dict[str, Any]) -> list[dict[str, Any]]:
+    """Expand a ``bulk`` section into one put-commit per generated demo.
+
+    Each demo is its own (live) commit chained onto ``bulk["after"]`` and
+    advancing ``bulk["branch"]``, so they all appear in that branch's index
+    -- enough volume for the front end to exercise pagination.
+    """
+    commits: list[dict[str, Any]] = []
+    prev = bulk["after"]
+    for demo in bulk_demos(bulk):
+        cid = f"bulk-{demo['name']}"
+        commits.append(
+            {
+                "id": cid,
+                "parents": [prev],
+                "branch": bulk["branch"],
+                "message": f"Add bulk demo {demo['name']}",
+                "ops": [
+                    {
+                        "kind": "put",
+                        "demo": f"bulk/{demo['name']}",
+                        "uuid": demo["uuid"],
+                        "programKind": demo["program_kind"],
+                        "demoKind": demo["demo_kind"],
+                        "displayName": demo["display_name"],
+                        "recommended": demo["recommended"],
+                    }
+                ],
+            }
+        )
+        prev = cid
+    return commits
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +372,7 @@ def _resolve_demo_spec(
         # Required: a missing programKind is a defect in the history YAML,
         # so let the KeyError escape rather than guessing a default.
         program_kind=op["programKind"],
+        display_name=op.get("displayName"),
     )
 
 
