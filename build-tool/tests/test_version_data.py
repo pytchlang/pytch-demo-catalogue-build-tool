@@ -158,6 +158,11 @@ def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
         assert history.uuid(a) not in listed
 
 
+def _chapter_count(markdown: str) -> int:
+    """Number of top-level (`#`) headings -- i.e. chapters -- in a description."""
+    return sum(1 for line in markdown.splitlines() if line.startswith("# "))
+
+
 def test_bulk_demos_cover_each_kind(history: History, dist: Path) -> None:
     """The bulk section yields `count` live demos for every
     (programKind, demoKind) combination, all reaching the served index."""
