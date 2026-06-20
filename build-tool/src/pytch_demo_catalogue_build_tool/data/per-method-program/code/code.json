@@ -1,0 +1,1 @@
+{"kind":"per-method","program":{"actors":[{"id":"022d1d89-eb8d-435a-9301-29d33a50b20f","kind":"stage","name":"Stage","handlers":[{"id":"5d19dae4-6f34-4a5e-b6c9-a510d27c1127","event":{"kind":"green-flag"},"pythonCode":"# {{uuid}}"}]}]}}
