@@ -163,6 +163,41 @@ def _chapter_count(markdown: str) -> int:
     return sum(1 for line in markdown.splitlines() if line.startswith("# "))
 
 
+def test_descriptions_are_chaptered(dist: Path) -> None:
+    """Every live demo's description.md is split into `#`-headed chapters,
+    with some demos having exactly one and others strictly more."""
+    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
+
+    counts = []
+    for entry in index:
+        description = (
+            dist / entry["uuid"] / "en" / "content" / "description.md"
+        ).read_text()
+        n = _chapter_count(description)
+        assert n >= 1, f"{entry['uuid']}: description has no chapters"
+        counts.append(n)
+
+    assert min(counts) == 1, "no demo has exactly one chapter"
+    assert max(counts) > 1, "no demo has more than one chapter"
+
+
+def test_some_demos_have_video_thumbnail(dist: Path) -> None:
+    """Some live demos carry a video thumbnail (extension in the served entry
+    and the file present in the dist) and some do not."""
+    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
+
+    with_video = [e for e in index if e["thumbnailVideoExtension"] is not None]
+    without_video = [e for e in index if e["thumbnailVideoExtension"] is None]
+
+    assert with_video, "no demo has a video thumbnail"
+    assert without_video, "every demo has a video thumbnail"
+
+    for entry in with_video:
+        ext = entry["thumbnailVideoExtension"]
+        video_path = dist / entry["uuid"] / "en" / "content" / f"thumbnail{ext}"
+        assert video_path.is_file(), f"missing video thumbnail for {entry['uuid']}"
+
+
 def test_bulk_demos_cover_each_kind(history: History, dist: Path) -> None:
     """The bulk section yields `count` live demos for every
     (programKind, demoKind) combination, all reaching the served index."""
