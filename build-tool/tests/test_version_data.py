@@ -17,8 +17,10 @@ import pytest
 
 from pytch_demo_catalogue_build_tool import version_data
 from pytch_demo_catalogue_build_tool.version_data import Extractor
+from pytch_demo_catalogue_build_tool.validate_catalogue import validate
 
 from pytch_demo_catalogue_build_tool.repo_builder import (
+    DATA_DIR,
     DEFAULT_HISTORY,
     BuiltRepo,
     History,
@@ -28,6 +30,10 @@ from pytch_demo_catalogue_build_tool.repo_builder import (
 )
 
 HISTORY_PATH = DEFAULT_HISTORY
+
+# A symlink (assumed present) within the package's data/ dir pointing at the
+# OpenAPI spec the served catalogue must conform to.
+SPEC_PATH = DATA_DIR / "disco-demos-openapi.yaml"
 
 HISTORY = load_history(HISTORY_PATH)
 
@@ -196,4 +202,23 @@ def test_bulk_demos_names_and_recommended(history: History, dist: Path) -> None:
     assert set(recommended.values()) == {2}
     assert len(recommended) == (
         len(history.bulk["programKinds"]) * len(history.bulk["demoKinds"])
+    )
+
+
+def test_dist_conforms_to_openapi_spec(dist: Path) -> None:
+    """The built catalogue validates against the OpenAPI spec.
+
+    ``SPEC_PATH`` is a symlink in the package's data/ dir pointing at the
+    spec the front end is served against; if it is absent (or its target
+    is missing) the check is skipped rather than failed, so a checkout
+    without the spec available does not break the suite.
+    """
+    if not SPEC_PATH.exists():
+        pytest.skip(
+            f"OpenAPI spec {SPEC_PATH} is absent; symlink it to "
+            "disco-demos-openapi.yaml to run this check"
+        )
+    report = validate(SPEC_PATH, dist)
+    assert report.errors == [], "catalogue does not conform to the spec:\n" + "\n".join(
+        report.errors
     )
