@@ -140,8 +140,12 @@ def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
         assert any(name.startswith("assets/files/") for name in zf.namelist())
 
     # A description-only change moved the defining commit: the built
-    # description.md is the rewording commit's message, not the add's.
-    assert description("descr").strip() == "Reword the story demo's description (a content change)"
+    # description.md's first chapter carries the rewording commit's message,
+    # not the add's.
+    assert (
+        "Reword the story demo's description (a content change)"
+        in description("descr")
+    )
 
     # The index lists exactly the live demos: the named live ones plus every
     # generated bulk demo, and none of the deleted/superseded versions.
