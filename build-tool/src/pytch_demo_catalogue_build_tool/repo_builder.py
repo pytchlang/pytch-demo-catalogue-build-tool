@@ -157,12 +157,17 @@ class FileState:
         for locale in spec.locales:
             base = f"by-locale/{locale}"
             put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
-            # description.md carries the commit message (see
-            # DemoSpec.description), so the built dist reveals which commit
-            # last defined the demo.
-            put(f"{base}/content/description.md", f"{spec.description}\n".encode())
+            # description.md is split into `#`-headed chapters (the front end
+            # renders each chapter separately); its first chapter's body is
+            # the commit message (see DemoSpec.description), so the built dist
+            # still reveals which commit last defined the demo.
+            put(f"{base}/content/description.md", spec.render_description())
             put(f"{base}/content/summary.md", f"{spec.summary}\n".encode())
             put(f"{base}/content/thumbnail.png", _TINY_PNG)
+            # Some demos also carry a video thumbnail; the build tool picks it
+            # up by its `thumbnail.<video-ext>` name (see repo_files).
+            if spec.has_video:
+                put(f"{base}/content/thumbnail.mp4", _TINY_MP4)
             for rel, data in project.items():
                 put(f"{base}/project/{rel}", data)
 
