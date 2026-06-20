@@ -244,6 +244,10 @@ class DemoSpec:
     author_name: str
     demo_kind: str
     program_kind: str
+    # Number of `#`-headed chapters in description.md (always >= 1).
+    chapters: int = 1
+    # Whether the demo also carries a (placeholder) video thumbnail.
+    has_video: bool = False
     # When set, overrides the project template's projectName (the demo's
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
