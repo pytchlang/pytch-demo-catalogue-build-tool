@@ -24,7 +24,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from typing import Any, Generator
+from typing import Any, Generator, Optional
 
 import pygit2
 
@@ -113,6 +113,21 @@ class Extractor:
 
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
+
+    def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
+        """Resolve the commit whose ancestry is analysed.
+
+        ``None`` means HEAD; otherwise ``start_ref`` is any revision
+        ``revparse_single`` understands (branch, tag, or SHA1).  The
+        result is peeled to a commit so an annotated tag works too.
+        """
+        if start_ref is None:
+            if self.repo.head_is_unborn:
+                raise RuntimeError("Repository has no HEAD; nothing to extract.")
+            obj: pygit2.Object = self.repo[self.repo.head.target]
+        else:
+            obj = self.repo.revparse_single(start_ref)
+        return obj.peel(pygit2.Commit)
 
     # ---------------------------------------------------------------
     # Formatting
