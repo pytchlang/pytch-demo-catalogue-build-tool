@@ -37,10 +37,22 @@ def log_level_option():
 @click.command()
 @click.argument("demos-repo", type=dir_argument())
 @click.argument("dist-root", type=dir_argument())
+@click.option(
+    "--start-ref",
+    default=None,
+    help=(
+        "Revision (branch, tag, or SHA1) whose history is analysed;"
+        " default is HEAD."
+    ),
+)
 @log_level_option()
-def build_dist(demos_repo: str, dist_root: str, log_level: int):
+def build_dist(demos_repo: str, dist_root: str, start_ref: str | None, log_level: int):
     configure_logging(log_level)
-    pytch_demo_catalogue_build_tool.version_data.main(Path(demos_repo), Path(dist_root))
+    pytch_demo_catalogue_build_tool.version_data.main(
+        Path(demos_repo),
+        Path(dist_root),
+        start_ref,
+    )
 
 
 @click.command()
