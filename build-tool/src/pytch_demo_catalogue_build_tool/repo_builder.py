@@ -162,7 +162,7 @@ class FileState:
             # the commit message (see DemoSpec.description), so the built dist
             # still reveals which commit last defined the demo.
             put(f"{base}/content/description.md", spec.render_description())
-            put(f"{base}/content/summary.md", f"{spec.summary}\n".encode())
+            put(f"{base}/content/summary.md", spec.render_summary())
             put(f"{base}/content/thumbnail.png", _TINY_PNG)
             # Some demos also carry a video thumbnail; the build tool picks it
             # up by its `thumbnail.<video-ext>` name (see repo_files).
@@ -277,13 +277,25 @@ class DemoSpec:
         commit's message -- so the built dist still identifies which commit
         last defined the demo, and two commits that share a ``description``
         (and ``chapters``) still produce byte-identical content.
+
+        The bodies carry a little inline markdown so a front end has
+        non-trivial markup to render and round-trip.
         """
-        chapters = [f"# Introduction\n\n{self.description}\n"]
+        chapters = [
+            f"# Introduction\n\nThis is the **{self.description}**.\n"
+        ]
         for n in range(2, self.chapters + 1):
             chapters.append(
-                f"# Chapter {n}\n\nMore about {self.summary} (part {n}).\n"
+                f"# Chapter {n}\n\n*More* about {self.summary} (part {n}).\n"
             )
         return "\n".join(chapters).encode()
+
+    def render_summary(self) -> bytes:
+        """Render this demo's ``summary.md``.
+
+        Include some markup.
+        """
+        return f"A **short** and *snappy* {self.summary}\n".encode()
 
 
 @dataclass
