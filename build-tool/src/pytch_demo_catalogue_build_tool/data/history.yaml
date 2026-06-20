@@ -191,3 +191,18 @@ scenarios:
 
   - start_ref: ambiguous
     expect_error: true
+
+# --- Bulk live demos for front-end pagination tests --------------------
+#
+# Hand-writing these would be unreadable, so repo_builder expands this
+# section into `count` live demos for every (programKind, demoKind)
+# combination -- here 25 x 2 x 2 = 100 demos -- each its own commit chained
+# onto `after` and advancing the `branch`, so they all join that branch's
+# catalogue index.  Their uuids are derived deterministically from the demo
+# name, so the built dist is stable across runs.
+bulk:
+  after: reword-story
+  branch: catalogue
+  count: 25
+  programKinds: [flat, per-method]
+  demoKinds: [game, snippet]
