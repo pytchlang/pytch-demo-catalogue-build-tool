@@ -56,6 +56,13 @@ _TINY_PNG = bytes.fromhex(
     "6082"
 )
 
+# A stand-in MP4 for demos that carry a video thumbnail.  The build tool only
+# copies thumbnail bytes verbatim, so any bytes suffice for its own tests; a
+# real (if tiny) clip keeps the output usable as a fixture for a front-end
+# that actually plays it.  This is a 1-second 480x360 black H.264 clip
+# generated with ffmpeg; regenerate it in place if a different clip is needed.
+_TINY_MP4 = (Path(__file__).parent / "data" / "tiny-thumbnail.mp4").read_bytes()
+
 
 # ---------------------------------------------------------------------------
 # In-memory file-state model
