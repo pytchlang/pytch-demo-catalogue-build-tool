@@ -79,20 +79,23 @@ class Extractor:
     instance is intended to be used once.
     """
 
-    def __init__(self, repo: pygit2.Repository) -> None:
-        if repo.head_is_unborn:
-            raise RuntimeError("Repository has no HEAD; nothing to extract.")
-
+    def __init__(
+        self, repo: pygit2.Repository, start_ref: Optional[str] = None
+    ) -> None:
         self.repo = repo
+
+        # The analysis runs over the ancestry of a single "tip" commit and
+        # treats that commit's tree as defining what is currently live.
+        tip_commit: pygit2.Commit = self._resolve_tip(start_ref)
 
         # Interpretation note: the spec says "searching every commit" for
         # uuid files.  I take "every commit" to mean every commit reachable
-        # from HEAD.  The spec elsewhere frames the problem in terms of
+        # from the tip.  The spec elsewhere frames the problem in terms of
         # state "as of HEAD" and describes updates to old major versions as
         # being merged back into the main line, so UUIDs that only ever
         # appear in a never-merged branch are out of scope.
         self.head_ancestry: list[pygit2.Commit] = list(
-            repo.walk(repo.head.target, pygit2.enums.SortMode.TOPOLOGICAL)
+            repo.walk(tip_commit.id, pygit2.enums.SortMode.TOPOLOGICAL)
         )
 
         self.all_uuids: set[str] = set()
@@ -104,9 +107,8 @@ class Extractor:
             self._scan_commit(commit)
 
         # A demo-major-version is "current" / discoverable iff its UUID is
-        # present in HEAD's own tree.
-        head_commit = self.repo[self.repo.head.target]
-        self.head_uuids: set[str] = set(self.commit_demos[head_commit.id].keys())
+        # present in the tip commit's own tree.
+        self.head_uuids: set[str] = set(self.commit_demos[tip_commit.id].keys())
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
         self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
