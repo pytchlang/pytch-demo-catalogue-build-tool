@@ -293,9 +293,12 @@ def bulk_demos(bulk: dict[str, Any]) -> list[dict[str, Any]]:
     """The demos a bulk section expands to, one dict each.
 
     Each carries its programKind, demoKind, demo-directory name, derived
-    uuid, a distinct displayName, and whether it is recommended (the first
-    ``BULK_RECOMMENDED_PER_CATEGORY`` of every category).  Exposed so tests
-    can predict the generated demos."""
+    uuid, a distinct displayName, whether it is recommended (the first
+    ``BULK_RECOMMENDED_PER_CATEGORY`` of every category), how many
+    description chapters it has, and whether it has a video thumbnail.  The
+    last two are varied across the run so the front end sees a mix of
+    single- and multi-chapter demos and of demos with and without video.
+    Exposed so tests can predict the generated demos."""
     demos: list[dict[str, Any]] = []
     for program_kind in bulk["programKinds"]:
         for demo_kind in bulk["demoKinds"]:
