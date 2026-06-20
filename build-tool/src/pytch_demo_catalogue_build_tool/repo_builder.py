@@ -252,6 +252,27 @@ class DemoSpec:
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
 
+    def render_description(self) -> bytes:
+        """Render this demo's ``description.md`` as one or more ``#``-headed
+        chapters.
+
+        The front end breaks a description into "chapters" at each top-level
+        heading (a single ``#``).  We always emit at least one chapter, and
+        ``self.chapters`` selects how many (several demos deliberately use
+        more than one so multi-chapter rendering is exercised).
+
+        The first chapter's body is ``self.description`` -- i.e. the defining
+        commit's message -- so the built dist still identifies which commit
+        last defined the demo, and two commits that share a ``description``
+        (and ``chapters``) still produce byte-identical content.
+        """
+        chapters = [f"# Introduction\n\n{self.description}\n"]
+        for n in range(2, self.chapters + 1):
+            chapters.append(
+                f"# Chapter {n}\n\nMore about {self.summary} (part {n}).\n"
+            )
+        return "\n".join(chapters).encode()
+
 
 @dataclass
 class History:
