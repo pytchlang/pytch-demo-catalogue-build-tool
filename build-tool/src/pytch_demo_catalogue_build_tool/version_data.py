@@ -24,7 +24,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from typing import Any, Generator
+from typing import Any, Generator, Optional
 
 import pygit2
 
@@ -79,20 +79,23 @@ class Extractor:
     instance is intended to be used once.
     """
 
-    def __init__(self, repo: pygit2.Repository) -> None:
-        if repo.head_is_unborn:
-            raise RuntimeError("Repository has no HEAD; nothing to extract.")
-
+    def __init__(
+        self, repo: pygit2.Repository, start_ref: Optional[str] = None
+    ) -> None:
         self.repo = repo
+
+        # The analysis runs over the ancestry of a single "tip" commit and
+        # treats that commit's tree as defining what is currently live.
+        tip_commit: pygit2.Commit = self._resolve_tip(start_ref)
 
         # Interpretation note: the spec says "searching every commit" for
         # uuid files.  I take "every commit" to mean every commit reachable
-        # from HEAD.  The spec elsewhere frames the problem in terms of
+        # from the tip.  The spec elsewhere frames the problem in terms of
         # state "as of HEAD" and describes updates to old major versions as
         # being merged back into the main line, so UUIDs that only ever
         # appear in a never-merged branch are out of scope.
         self.head_ancestry: list[pygit2.Commit] = list(
-            repo.walk(repo.head.target, pygit2.enums.SortMode.TOPOLOGICAL)
+            repo.walk(tip_commit.id, pygit2.enums.SortMode.TOPOLOGICAL)
         )
 
         self.all_uuids: set[str] = set()
@@ -104,15 +107,29 @@ class Extractor:
             self._scan_commit(commit)
 
         # A demo-major-version is "current" / discoverable iff its UUID is
-        # present in HEAD's own tree.
-        head_commit = self.repo[self.repo.head.target]
-        self.head_uuids: set[str] = set(self.commit_demos[head_commit.id].keys())
+        # present in the tip commit's own tree.
+        self.head_uuids: set[str] = set(self.commit_demos[tip_commit.id].keys())
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
         self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
 
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
+
+    def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
+        """Resolve the commit whose ancestry is analysed.
+
+        ``None`` means HEAD; otherwise ``start_ref`` is any revision
+        ``revparse_single`` understands (branch, tag, or SHA1).  The
+        result is peeled to a commit so an annotated tag works too.
+        """
+        if start_ref is None:
+            if self.repo.head_is_unborn:
+                raise RuntimeError("Repository has no HEAD; nothing to extract.")
+            obj: pygit2.Object = self.repo[self.repo.head.target]
+        else:
+            obj = self.repo.revparse_single(start_ref)
+        return obj.peel(pygit2.Commit)
 
     # ---------------------------------------------------------------
     # Formatting
@@ -518,14 +535,14 @@ def gather_index_records(
 # ---------------------------------------------------------------------------
 
 
-def main(repo_path: Path, dist_path: Path) -> None:
+def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> None:
     discovered = pygit2.discover_repository(repo_path)
     if discovered is None:
         sys.stderr.write(f"No git repository found at {repo_path!r}\n")
         sys.exit(1)
     repo = pygit2.Repository(discovered)
 
-    records = Extractor(repo).demo_major_version_records()
+    records = Extractor(repo, start_ref).demo_major_version_records()
     for r in records:
         r.write_dist_files(dist_path)
 
