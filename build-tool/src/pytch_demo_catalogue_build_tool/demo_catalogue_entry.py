@@ -18,7 +18,7 @@ class CatalogueEntry:
     recommended: bool
     thumbnailImageExtension: str
     thumbnailVideoExtension: Optional[str]
-    latestUuid: str
+    latestUuid: Optional[str]
 
     @property
     def thumb_image_basename(self) -> Path:
