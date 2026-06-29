@@ -309,6 +309,11 @@ def bulk_demos(bulk: dict[str, Any]) -> list[dict[str, Any]]:
                         "uuid": str(uuid5(BULK_UUID_NAMESPACE, name)),
                         "display_name": f"{program_kind} {demo_kind} demo {i:02d}",
                         "recommended": i < BULK_RECOMMENDED_PER_CATEGORY,
+                        # 1, 2, 3, 1, 2, 3, ... -> a mix of single- and
+                        # multi-chapter demos, always at least one chapter.
+                        "chapters": 1 + (i % 3),
+                        # Every other demo carries a video thumbnail.
+                        "has_video": (i % 2 == 0),
                     }
                 )
     return demos
@@ -340,6 +345,8 @@ def _expand_bulk(bulk: dict[str, Any]) -> list[dict[str, Any]]:
                         "demoKind": demo["demo_kind"],
                         "displayName": demo["display_name"],
                         "recommended": demo["recommended"],
+                        "chapters": demo["chapters"],
+                        "video": demo["has_video"],
                     }
                 ],
             }
@@ -372,6 +379,8 @@ def _resolve_demo_spec(
         # Required: a missing programKind is a defect in the history YAML,
         # so let the KeyError escape rather than guessing a default.
         program_kind=op["programKind"],
+        chapters=op.get("chapters", 1),
+        has_video=op.get("video", False),
         display_name=op.get("displayName"),
     )
 
