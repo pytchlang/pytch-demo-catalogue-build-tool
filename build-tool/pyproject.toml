@@ -11,7 +11,9 @@ dependencies = [
     "click (>=8.3.3,<9.0.0)",
     "colorlog (>=6.10.1,<7.0.0)",
     "click-loglevel (>=0.7.0,<0.8.0)",
-    "pyyaml (>=6.0.3,<7.0.0)"
+    "pyyaml (>=6.0.3,<7.0.0)",
+    "jsonschema (>=4.26.0,<5.0.0)",
+    "rfc3339-validator (>=0.1.4,<0.2.0)"
 ]
 
 [project.scripts]
@@ -19,6 +21,7 @@ build-dist = "pytch_demo_catalogue_build_tool.cli:build_dist"
 new-demo = "pytch_demo_catalogue_build_tool.cli:new_demo"
 update-demo-project = "pytch_demo_catalogue_build_tool.cli:update_demo"
 build-test-repo = "pytch_demo_catalogue_build_tool.repo_builder:main"
+validate-catalogue = "pytch_demo_catalogue_build_tool.cli:validate_catalogue"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

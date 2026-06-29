@@ -7,6 +7,7 @@ import colorlog
 import pytch_demo_catalogue_build_tool.version_data
 import pytch_demo_catalogue_build_tool.new_demo
 import pytch_demo_catalogue_build_tool.update_demo_project
+import pytch_demo_catalogue_build_tool.validate_catalogue
 
 
 def configure_logging(log_level: int):
@@ -86,4 +87,26 @@ def update_demo(
     configure_logging(log_level)
     pytch_demo_catalogue_build_tool.update_demo_project.main(
         Path(demo_dirname), locale, Path(project_zipfile)
+    )
+
+
+@click.command()
+@click.option(
+    "--spec",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
+    help="path to the OpenAPI spec (disco-demos-openapi.yaml)",
+)
+@log_level_option()
+@click.option(
+    "--content-dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, readable=True, path_type=Path),
+    help="root directory of the generated demo content feed",
+)
+def validate_catalogue(spec, content_dir, log_level):
+    configure_logging(log_level)
+    pytch_demo_catalogue_build_tool.validate_catalogue.main(
+        spec,
+        content_dir
     )
