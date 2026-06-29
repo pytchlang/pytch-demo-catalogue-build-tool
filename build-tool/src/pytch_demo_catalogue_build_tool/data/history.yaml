@@ -13,7 +13,10 @@
 # explicit `description` where two commits must share one (e.g. a change to
 # only `recommended` must not alter content).  `programKind` (required, no
 # default) selects which project template in this package's data/ dir the
-# demo is built from.
+# demo is built from.  `chapters` (default 1) sets how many `#`-headed
+# chapters description.md has, and `video: true` adds a video thumbnail; both
+# are content, so paired commits that must not count as a change have to
+# agree on them too.
 #
 # `uuids` gives short aliases so the rest of the file stays readable; an
 # alias is resolved to its uuid wherever a uuid is expected (in `ops` and
@@ -54,7 +57,10 @@ commits:
     message: "Release a new major version of the flowers demo"
     ops:
       # Same directory, new uuid in place -> a major-version chain link.
-      - {kind: put, demo: flowers, uuid: superB, programKind: flat}
+      # A multi-chapter description plus a video thumbnail, so the front end
+      # has a live demo exercising both.
+      - {kind: put, demo: flowers, uuid: superB, programKind: flat,
+         chapters: 3, video: true}
 
   - id: add-gone
     branch: catalogue
@@ -98,7 +104,10 @@ commits:
     branch: catalogue
     message: "Add a demo that will later be moved within the tree"
     ops:
-      - {kind: put, demo: rover, uuid: mover, programKind: flat}
+      # Single-chapter, but with a video thumbnail: a live demo covering the
+      # single-chapter + video combination.  (The later move does not rewrite
+      # content, so the video survives to head.)
+      - {kind: put, demo: rover, uuid: mover, programKind: flat, video: true}
 
   - id: move-mover
     branch: catalogue
@@ -117,8 +126,9 @@ commits:
     message: "Reword the story demo's description (a content change)"
     ops:
       # Same uuid/project; only description.md changes -> a modification, so
-      # this becomes the demo's defining commit.
-      - {kind: put, demo: story, uuid: descr, programKind: flat}
+      # this becomes the demo's defining commit.  The reworded description is
+      # multi-chapter (and add-story's was single), itself a content change.
+      - {kind: put, demo: story, uuid: descr, programKind: flat, chapters: 2}
 
 # --- A non-linear history that is ambiguous (old-versions.md example) ---
 #
