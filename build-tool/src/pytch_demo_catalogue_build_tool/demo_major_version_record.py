@@ -25,6 +25,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     latest_uuid: str
     _defining_commit_id: str
     _demo_root_path: Path
+    _present_at_head: bool
 
     @property
     def repo(self) -> pygit2.Repository:
@@ -39,8 +40,16 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         return self._demo_root_path
 
     @property
-    def is_latest(self) -> bool:
-        return self.uuid == self.latest_uuid
+    def present_at_head(self) -> bool:
+        """True iff this demo-major-version exists in HEAD's tree.
+
+        This is the test for whether the demo is currently
+        discoverable: deleted demos survive in the history (and so
+        still have their explanatory content written out for extant
+        linked projects) but do not appear in the index, and do not
+        have a fresh project zip or thumbnails written.
+        """
+        return self._present_at_head
 
     @property
     def commit(self) -> pygit2.Commit:
@@ -105,7 +114,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     def index_contributions(self) -> list[IndexRecord]:
         return (
             []
-            if not self.is_latest
+            if not self.present_at_head
             else [
                 (locale_code, self.catalogue_entry(locale_code))
                 for locale_code in self.locale_codes()
@@ -230,7 +239,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
 
         # TODO: Assets used in "description" markdown.
 
-        if self.is_latest:
+        if self.present_at_head:
             # Also need thumbnails and project zipfile.
 
             # Thumbnail image.
