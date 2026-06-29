@@ -13,7 +13,8 @@ dependencies = [
     "click-loglevel (>=0.7.0,<0.8.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
     "jsonschema (>=4.26.0,<5.0.0)",
-    "rfc3339-validator (>=0.1.4,<0.2.0)"
+    "rfc3339-validator (>=0.1.4,<0.2.0)",
+    "black (>=26.5.1,<27.0.0)"
 ]
 
 [project.scripts]
@@ -26,3 +27,11 @@ validate-catalogue = "pytch_demo_catalogue_build_tool.cli:validate_catalogue"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.1.1,<10.0.0)"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

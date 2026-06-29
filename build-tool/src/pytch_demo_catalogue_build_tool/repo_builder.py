@@ -56,6 +56,13 @@ _TINY_PNG = bytes.fromhex(
     "6082"
 )
 
+# A stand-in MP4 for demos that carry a video thumbnail.  The build tool only
+# copies thumbnail bytes verbatim, so any bytes suffice for its own tests; a
+# real (if tiny) clip keeps the output usable as a fixture for a front-end
+# that actually plays it.  This is a 1-second 480x360 black H.264 clip
+# generated with ffmpeg; regenerate it in place if a different clip is needed.
+_TINY_MP4 = (Path(__file__).parent / "data" / "tiny-thumbnail.mp4").read_bytes()
+
 
 # ---------------------------------------------------------------------------
 # In-memory file-state model
@@ -150,12 +157,17 @@ class FileState:
         for locale in spec.locales:
             base = f"by-locale/{locale}"
             put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
-            # description.md carries the commit message (see
-            # DemoSpec.description), so the built dist reveals which commit
-            # last defined the demo.
-            put(f"{base}/content/description.md", f"{spec.description}\n".encode())
-            put(f"{base}/content/summary.md", f"{spec.summary}\n".encode())
+            # description.md is split into `#`-headed chapters (the front end
+            # renders each chapter separately); its first chapter's body is
+            # the commit message (see DemoSpec.description), so the built dist
+            # still reveals which commit last defined the demo.
+            put(f"{base}/content/description.md", spec.render_description())
+            put(f"{base}/content/summary.md", spec.render_summary())
             put(f"{base}/content/thumbnail.png", _TINY_PNG)
+            # Some demos also carry a video thumbnail; the build tool picks it
+            # up by its `thumbnail.<video-ext>` name (see repo_files).
+            if spec.has_video:
+                put(f"{base}/content/thumbnail.mp4", _TINY_MP4)
             for rel, data in project.items():
                 put(f"{base}/project/{rel}", data)
 
@@ -244,9 +256,46 @@ class DemoSpec:
     author_name: str
     demo_kind: str
     program_kind: str
+    # Number of `#`-headed chapters in description.md (always >= 1).
+    chapters: int = 1
+    # Whether the demo also carries a (placeholder) video thumbnail.
+    has_video: bool = False
     # When set, overrides the project template's projectName (the demo's
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
+
+    def render_description(self) -> bytes:
+        """Render this demo's ``description.md`` as one or more ``#``-headed
+        chapters.
+
+        The front end breaks a description into "chapters" at each top-level
+        heading (a single ``#``).  We always emit at least one chapter, and
+        ``self.chapters`` selects how many (several demos deliberately use
+        more than one so multi-chapter rendering is exercised).
+
+        The first chapter's body is ``self.description`` -- i.e. the defining
+        commit's message -- so the built dist still identifies which commit
+        last defined the demo, and two commits that share a ``description``
+        (and ``chapters``) still produce byte-identical content.
+
+        The bodies carry a little inline markdown so a front end has
+        non-trivial markup to render and round-trip.
+        """
+        chapters = [
+            f"# Introduction\n\nThis is the **{self.description}**.\n"
+        ]
+        for n in range(2, self.chapters + 1):
+            chapters.append(
+                f"# Chapter {n}\n\n*More* about {self.summary} (part {n}).\n"
+            )
+        return "\n".join(chapters).encode()
+
+    def render_summary(self) -> bytes:
+        """Render this demo's ``summary.md``.
+
+        Include some markup.
+        """
+        return f"A **short** and *snappy* {self.summary}\n".encode()
 
 
 @dataclass
@@ -293,9 +342,12 @@ def bulk_demos(bulk: dict[str, Any]) -> list[dict[str, Any]]:
     """The demos a bulk section expands to, one dict each.
 
     Each carries its programKind, demoKind, demo-directory name, derived
-    uuid, a distinct displayName, and whether it is recommended (the first
-    ``BULK_RECOMMENDED_PER_CATEGORY`` of every category).  Exposed so tests
-    can predict the generated demos."""
+    uuid, a distinct displayName, whether it is recommended (the first
+    ``BULK_RECOMMENDED_PER_CATEGORY`` of every category), how many
+    description chapters it has, and whether it has a video thumbnail.  The
+    last two are varied across the run so the front end sees a mix of
+    single- and multi-chapter demos and of demos with and without video.
+    Exposed so tests can predict the generated demos."""
     demos: list[dict[str, Any]] = []
     for program_kind in bulk["programKinds"]:
         for demo_kind in bulk["demoKinds"]:
@@ -309,6 +361,11 @@ def bulk_demos(bulk: dict[str, Any]) -> list[dict[str, Any]]:
                         "uuid": str(uuid5(BULK_UUID_NAMESPACE, name)),
                         "display_name": f"{program_kind} {demo_kind} demo {i:02d}",
                         "recommended": i < BULK_RECOMMENDED_PER_CATEGORY,
+                        # 1, 2, 3, 1, 2, 3, ... -> a mix of single- and
+                        # multi-chapter demos, always at least one chapter.
+                        "chapters": 1 + (i % 3),
+                        # Every other demo carries a video thumbnail.
+                        "has_video": (i % 2 == 0),
                     }
                 )
     return demos
@@ -340,6 +397,8 @@ def _expand_bulk(bulk: dict[str, Any]) -> list[dict[str, Any]]:
                         "demoKind": demo["demo_kind"],
                         "displayName": demo["display_name"],
                         "recommended": demo["recommended"],
+                        "chapters": demo["chapters"],
+                        "video": demo["has_video"],
                     }
                 ],
             }
@@ -372,6 +431,8 @@ def _resolve_demo_spec(
         # Required: a missing programKind is a defect in the history YAML,
         # so let the KeyError escape rather than guessing a default.
         program_kind=op["programKind"],
+        chapters=op.get("chapters", 1),
+        has_video=op.get("video", False),
         display_name=op.get("displayName"),
     )
 

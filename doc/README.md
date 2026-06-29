@@ -1,6 +1,13 @@
 # Build-tool for discoverable demos for Pytch
 
 
+## Running unit tests
+
+``` shell
+poetry -P build-tool run pytest -v
+```
+
+
 ## In-repo structure of each demo
 
 The "repo" referred to in this section is the repository containing
