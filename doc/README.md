@@ -105,8 +105,6 @@ The structure, relative to a "demo catalogue base" URL, is as follows.
 
     * `e9⋯f6/en/content/description.md`
 
-    * `e9⋯f6/en/content/summary.md`
-
     * `e9⋯f6/en/content/assets/` — Directory containing assets needed
       for the description content, e.g., screenshots, diagrams.
 
