@@ -18,6 +18,7 @@ dependencies = [
 build-dist = "pytch_demo_catalogue_build_tool.cli:build_dist"
 new-demo = "pytch_demo_catalogue_build_tool.cli:new_demo"
 update-demo-project = "pytch_demo_catalogue_build_tool.cli:update_demo"
+build-test-repo = "pytch_demo_catalogue_build_tool.repo_builder:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
