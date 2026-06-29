@@ -10,13 +10,15 @@ dependencies = [
     "pygit2 (>=1.19.2,<2.0.0)",
     "click (>=8.3.3,<9.0.0)",
     "colorlog (>=6.10.1,<7.0.0)",
-    "click-loglevel (>=0.7.0,<0.8.0)"
+    "click-loglevel (>=0.7.0,<0.8.0)",
+    "pyyaml (>=6.0.3,<7.0.0)"
 ]
 
 [project.scripts]
 build-dist = "pytch_demo_catalogue_build_tool.cli:build_dist"
 new-demo = "pytch_demo_catalogue_build_tool.cli:new_demo"
 update-demo-project = "pytch_demo_catalogue_build_tool.cli:update_demo"
+build-test-repo = "pytch_demo_catalogue_build_tool.repo_builder:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
