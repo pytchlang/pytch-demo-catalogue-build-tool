@@ -103,7 +103,9 @@ def test_ambiguous_history_raises(built: BuiltRepo, scenario: dict) -> None:
         Extractor(built.repo, scenario["start_ref"])
 
 
-def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
+def test_build_dist_marks_deleted_demo(
+    history: History, dist: Path, dist_demos_index: list[dict]
+) -> None:
     """A full build: deleted demos keep their explanatory content but get a
     null latestUuid and no fresh project zip; superseded demos point at the
     live successor; live demos point to themselves and get a zip."""
@@ -149,8 +151,7 @@ def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
 
     # The index lists exactly the live demos: the named live ones plus every
     # generated bulk demo, and none of the deleted/superseded versions.
-    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
-    listed = {e["uuid"] for e in index}
+    listed = {e["uuid"] for e in dist_demos_index}
     named_live = {history.uuid(a) for a in ("live", "superB", "mover", "descr")}
     bulk_uuids = {d["uuid"] for d in bulk_demos(history.bulk)}
     assert listed == named_live | bulk_uuids
@@ -165,13 +166,11 @@ def _chapter_count(markdown: str) -> int:
     return sum(1 for line in markdown.splitlines() if line.startswith("# "))
 
 
-def test_descriptions_are_chaptered(dist: Path) -> None:
+def test_descriptions_are_chaptered(dist: Path, dist_demos_index: list[dict]) -> None:
     """Every live demo's description.md is split into `#`-headed chapters,
     with some demos having exactly one and others strictly more."""
-    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
-
     counts = []
-    for entry in index:
+    for entry in dist_demos_index:
         description = (
             dist / entry["uuid"] / "en" / "content" / "description.md"
         ).read_text()
@@ -183,13 +182,17 @@ def test_descriptions_are_chaptered(dist: Path) -> None:
     assert max(counts) > 1, "no demo has more than one chapter"
 
 
-def test_some_demos_have_video_thumbnail(dist: Path) -> None:
+def test_some_demos_have_video_thumbnail(
+    dist: Path, dist_demos_index: list[dict]
+) -> None:
     """Some live demos carry a video thumbnail (extension in the served entry
     and the file present in the dist) and some do not."""
-    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
-
-    with_video = [e for e in index if e["thumbnailVideoExtension"] is not None]
-    without_video = [e for e in index if e["thumbnailVideoExtension"] is None]
+    with_video = [
+        e for e in dist_demos_index if e["thumbnailVideoExtension"] is not None
+    ]
+    without_video = [
+        e for e in dist_demos_index if e["thumbnailVideoExtension"] is None
+    ]
 
     assert with_video, "no demo has a video thumbnail"
     assert without_video, "every demo has a video thumbnail"
@@ -200,16 +203,17 @@ def test_some_demos_have_video_thumbnail(dist: Path) -> None:
         assert video_path.is_file(), f"missing video thumbnail for {entry['uuid']}"
 
 
-def test_bulk_demos_cover_each_kind(history: History, dist: Path) -> None:
+def test_bulk_demos_cover_each_kind(
+    history: History, dist: Path, dist_demos_index: list[dict]
+) -> None:
     """The bulk section yields `count` live demos for every
     (programKind, demoKind) combination, all reaching the served index."""
     from collections import Counter
 
-    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
     bulk_uuids = {d["uuid"] for d in bulk_demos(history.bulk)}
     counts = Counter(
         (e["programKind"], e["demoKind"])
-        for e in index
+        for e in dist_demos_index
         if e["uuid"] in bulk_uuids
     )
 
@@ -222,13 +226,14 @@ def test_bulk_demos_cover_each_kind(history: History, dist: Path) -> None:
     assert dict(counts) == expected
 
 
-def test_bulk_demos_names_and_recommended(history: History, dist: Path) -> None:
+def test_bulk_demos_names_and_recommended(
+    history: History, dist: Path, dist_demos_index
+) -> None:
     """Bulk demos have distinct display names, and exactly the first two of
     each category are recommended."""
     from collections import Counter
 
-    index = json.loads((dist / "index" / "en" / "demos.json").read_text())
-    by_uuid = {e["uuid"]: e for e in index}
+    by_uuid = {e["uuid"]: e for e in dist_demos_index}
     expected = bulk_demos(history.bulk)
 
     # Every generated demo's displayName / recommended reach the index as
