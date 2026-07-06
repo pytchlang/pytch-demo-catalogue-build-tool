@@ -74,9 +74,8 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
         record = records[uuid]
 
         want_latest = history.uuid(want["latest"])  # None passes through
-        assert (
-            record.latest_uuid == want_latest
-        ), f"{alias}: latest_uuid {record.latest_uuid} != {want_latest}"
+        latest_err = f"{alias}: latest_uuid {record.latest_uuid} != {want_latest}"
+        assert record.latest_uuid == want_latest, latest_err
         assert record.present_at_head == want["present"], alias
 
         if "defined_at" in want:
@@ -140,9 +139,8 @@ def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
     # A description-only change moved the defining commit: the built
     # description.md's first chapter carries the rewording commit's message,
     # not the add's.
-    assert "Reword the story demo's description (a content change)" in description(
-        "descr"
-    )
+    exp_fragment = "Reword the story demo's description (a content change)"
+    assert exp_fragment in description("descr")
 
     # The index lists exactly the live demos: the named live ones plus every
     # generated bulk demo, and none of the deleted/superseded versions.
