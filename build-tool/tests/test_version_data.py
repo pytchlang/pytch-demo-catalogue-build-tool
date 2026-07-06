@@ -62,6 +62,11 @@ def dist(built: BuiltRepo, tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
+@pytest.fixture(scope="session")
+def dist_demos_index(dist: Path):
+    return json.loads((dist / "index" / "en" / "demos.json").read_text())
+
+
 @pytest.mark.parametrize(
     "scenario", _scenarios(with_error=False), ids=lambda s: s["start_ref"]
 )
