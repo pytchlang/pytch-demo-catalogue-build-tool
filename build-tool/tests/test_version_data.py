@@ -65,9 +65,7 @@ def dist(built: BuiltRepo, tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.mark.parametrize(
     "scenario", _scenarios(with_error=False), ids=lambda s: s["start_ref"]
 )
-def test_extracted_records(
-    history: History, built: BuiltRepo, scenario: dict
-) -> None:
+def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -> None:
     extractor = Extractor(built.repo, scenario["start_ref"])
     records = {r.uuid: r for r in extractor.demo_major_version_records()}
 
@@ -76,9 +74,9 @@ def test_extracted_records(
         record = records[uuid]
 
         want_latest = history.uuid(want["latest"])  # None passes through
-        assert record.latest_uuid == want_latest, (
-            f"{alias}: latest_uuid {record.latest_uuid} != {want_latest}"
-        )
+        assert (
+            record.latest_uuid == want_latest
+        ), f"{alias}: latest_uuid {record.latest_uuid} != {want_latest}"
         assert record.present_at_head == want["present"], alias
 
         if "defined_at" in want:
@@ -142,9 +140,8 @@ def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
     # A description-only change moved the defining commit: the built
     # description.md's first chapter carries the rewording commit's message,
     # not the add's.
-    assert (
-        "Reword the story demo's description (a content change)"
-        in description("descr")
+    assert "Reword the story demo's description (a content change)" in description(
+        "descr"
     )
 
     # The index lists exactly the live demos: the named live ones plus every
