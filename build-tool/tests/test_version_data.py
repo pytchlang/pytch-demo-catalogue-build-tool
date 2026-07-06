@@ -155,6 +155,8 @@ def test_build_dist_marks_deleted_demo(history: History, dist: Path) -> None:
 
 def _chapter_count(markdown: str) -> int:
     """Number of top-level (`#`) headings -- i.e. chapters -- in a description."""
+    # TODO: Will need updating if we ever, say, put lines starting
+    # with '#' inside fenced code blocks in a description file.
     return sum(1 for line in markdown.splitlines() if line.startswith("# "))
 
 
