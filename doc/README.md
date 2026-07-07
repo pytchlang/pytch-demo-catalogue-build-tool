@@ -11,8 +11,12 @@ poetry -P build-tool run pytest -v
 ## In-repo structure of each demo
 
 The "repo" referred to in this section is the repository containing
-the demos.  This is distinct from the repo containing this README
-file, which is the repo containing the tool to process such demos.
+the demos (the "content repo").  This is distinct from the repo
+containing this README file, which is the repo containing the tool to
+process such demos.
+
+We will refer to the "content" repo's root as
+`$DEMO_CATALOGUE_REPO_ROOT`.
 
 Each demo has its own "root" directory (folder) somewhere under
 `$DEMO_CATALOGUE_REPO_ROOT/demos/`.  For example, we might have a demo
@@ -41,7 +45,7 @@ In the rest of this section, we'll refer to that directory as
     object giving language-specific metadata with the following
     properties:
 
-    * `recommended`
+    * `recommended`: boolean
 
   * `$DEMO_ROOT/by-locale/en/content/` — Directory containing the
     English content for human consumption.  Within this directory are:
@@ -83,8 +87,8 @@ In the rest of this section, we'll refer to that directory as
 
 The front-end requires the information in a different structure, so
 this repo also contains a tool to convert the repo to a "distribution"
-structure.  This is written to `$REPO_ROOT/dist/`, which is therefore
-git-ignored.
+structure.  This is written to `$DEMO_CATALOGUE_REPO_ROOT/dist/`,
+which is therefore git-ignored.
 
 The structure, relative to a "demo catalogue base" URL, is as follows.
 
@@ -120,8 +124,9 @@ The structure, relative to a "demo catalogue base" URL, is as follows.
       also be `.jpg` or other image format.
 
     * `e9⋯f6/en/content/thumbnail.mp4` — _(Optional.  Only present
-      under the uuid for the current version of the demo.)_
-      Screenshot video.  Can also be other video format.
+      (and even then, optionally) under the uuid for the current
+      version of the demo.)_  Screenshot video.  Can also be other
+      video format.
 
   * `e9⋯f6/en/project.zip` — _(Only present under the uuid for the
     current version of the demo.)_  Pytch zipfile for the demo.
@@ -214,20 +219,21 @@ can be useful to see what the tools are doing.
 ### Tool to build distribution structure
 
 ``` shell
-cd $REPO_ROOT
-poetry run -P build-tool build-dist $DEMO_CATALOGUE_REPO_ROOT dist
+cd "$REPO_ROOT"
+poetry run -P build-tool build-dist \
+    "$DEMO_CATALOGUE_REPO_ROOT" "$DEMO_CATALOGUE_REPO_ROOT"/dist
 ```
 
 Reads all demos under `$DEMO_CATALOGUE_REPO_ROOT` and writes a
-distribution file structure under `dist/`.  In principle, a directory
-other than `dist` could be specified, but this is unlikely to be
-useful.
+distribution file structure under `$DEMO_CATALOGUE_REPO_ROOT/dist/`.
+In principle, a directory other than `$DEMO_CATALOGUE_REPO_ROOT/dist/`
+could be specified, but this is unlikely to be useful.
 
 As noted above, verbosity can be increased:
 
 ``` shell
 poetry run -P build-tool build-dist --log-level=INFO \
-    $DEMO_CATALOGUE_REPO_ROOT dist
+    "$DEMO_CATALOGUE_REPO_ROOT" "$DEMO_CATALOGUE_REPO_ROOT"/dist
 ```
 
 ### Tool to create a new demo
@@ -236,9 +242,9 @@ A common use case is that a demo author has created, in Pytch, a
 project suitable to be a demo.  They can then run, for example,
 
 ``` shell
-cd $REPO_ROOT
+cd "$REPO_ROOT"
 poetry run -P build-tool new-demo \
-    $DEMO_CATALOGUE_REPO_ROOT/demos/whizzy-games/feed-the-kittens \
+    "$DEMO_CATALOGUE_REPO_ROOT"/demos/whizzy-games/feed-the-kittens \
     en \
     feed-kittens.zip
 ```
@@ -262,3 +268,33 @@ The result will be a collection of files including some marked with
 TODOs.  Once the content of the `description.md` and `summary.md`
 files has been written, and the metadata filled in, the new files can
 all be committed to git.
+
+### Tool to update a demo
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool update-demo-project \
+    "$DEMO_CATALOGUE_REPO_ROOT"/demos/whizzy-games/feed-the-kittens \
+    en \
+    feed-kittens.zip
+```
+
+Replaces the project content with that from the given zipfile.
+
+### Tool to build unit-test repo
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool build-test-repo --help
+```
+
+for details.  Also used internally by unit tests to generate fixtures.
+
+### Tool to validate built output against spec
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool validate-catalogue --help
+```
+
+for details.  Also used internally by unit tests.
