@@ -268,3 +268,33 @@ The result will be a collection of files including some marked with
 TODOs.  Once the content of the `description.md` and `summary.md`
 files has been written, and the metadata filled in, the new files can
 all be committed to git.
+
+### Tool to update a demo
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool update-demo-project \
+    "$DEMO_CATALOGUE_REPO_ROOT"/demos/whizzy-games/feed-the-kittens \
+    en \
+    feed-kittens.zip
+```
+
+Replaces the project content with that from the given zipfile.
+
+### Tool to build unit-test repo
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool build-test-repo --help
+```
+
+for details.  Also used internally by unit tests to generate fixtures.
+
+### Tool to validate built output against spec
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool validate-catalogue --help
+```
+
+for details.  Also used internally by unit tests.
