@@ -127,6 +127,17 @@ class Extractor:
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
 
+        mtime_commits: dict[str, DefiningCommit] \
+            = self._find_defining_commits(normalise_locale_metadata=True)
+
+        if mtime_commits.keys() != self.all_uuids:
+            raise AssertionError("not every UUID has an mtime commit")
+
+        self.effective_mtime_commits: dict[str, int] = {
+            uuid: commit.sha1
+            for uuid, commit in mtime_commits.items()
+        }
+
     def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
         """Resolve the commit whose ancestry is analysed.
 
