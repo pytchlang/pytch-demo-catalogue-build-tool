@@ -103,6 +103,12 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         """
         return self._present_at_head
 
+    def _commit(self, sha1: str) -> pygit2.Commit:
+        repo_obj = self.repo[sha1]
+        if not isinstance(repo_obj, pygit2.Commit):
+            raise RuntimeError(f"id {sha1} did not give Commit")
+        return repo_obj
+
     @property
     def commit(self) -> pygit2.Commit:
         repo_obj = self.repo[self.defining_commit_id]
