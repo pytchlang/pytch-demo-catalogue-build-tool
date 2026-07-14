@@ -550,7 +550,10 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
         for path_str in repo.status():
             logger.info(f"- {path_str}")
 
-    records = Extractor(repo, start_ref).demo_major_version_records()
+    records = DemoMajorVersionRecord.grouped_by_latest(
+        Extractor(repo, start_ref).demo_major_version_records()
+    )
+
     for r in records:
         r.write_dist_files(dist_path)
 
