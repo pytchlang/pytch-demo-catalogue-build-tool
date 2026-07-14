@@ -120,7 +120,9 @@ class Extractor:
         self.head_uuids: set[str] = set(self.commit_demos[tip_commit.id].keys())
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
-        self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
+
+        self.defining_commits: dict[str, DefiningCommit] \
+            = self._find_defining_commits(normalise_locale_metadata=False)
 
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
