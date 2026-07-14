@@ -178,6 +178,7 @@ class Extractor:
                 self._latest_uuid(uuid),
                 (demo_commit := self.defining_commits[uuid]).sha1,
                 Path(demo_commit.uuid_file_path).parent,
+                self.effective_mtime_commits[uuid],
                 uuid in self.head_uuids,
             )
             for uuid in sorted_uuids

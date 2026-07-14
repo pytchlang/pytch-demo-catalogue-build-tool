@@ -26,6 +26,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     latest_uuid: Optional[str]
     _defining_commit_id: str
     _demo_root_path: Path
+    _effective_mtime_commit_id: str
     _present_at_head: bool
 
     @property
