@@ -91,6 +91,17 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
                 f"({want['defined_at']})"
             )
 
+        # The "mtime commit" is the most recent change OTHER than just
+        # a "recommended" flip, so it can lag behind the "defining
+        # commit" (see `live` and `beacon`).
+        if "mtime_at" in want:
+            want_sha = built.commit_oids[want["mtime_at"]]
+            got_sha = extractor.effective_mtime_commits[uuid]
+            assert got_sha == want_sha, (
+                f"{alias}: mtime_at {got_sha} != {want_sha} "
+                f"({want['mtime_at']})"
+            )
+
         if "program_kind" in want:
             assert record.common_program_kind() == want["program_kind"], alias
 
