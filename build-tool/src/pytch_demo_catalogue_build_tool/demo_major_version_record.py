@@ -40,6 +40,13 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             f"{self.uuid} {self._demo_root_path} ({self.status_str})"
         )
 
+    def within_group_sort_key(self):
+        # Make the latest version sort after any earlier version.
+        if self._present_at_head:
+            return "1"
+        else:
+            return f"0-{self.uuid}"
+
     @property
     def repo(self) -> pygit2.Repository:
         return self._repo
