@@ -28,6 +28,14 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     _present_at_head: bool
 
     @property
+    def status_str(self) -> str:
+        if self.present_at_head:
+            return "live"
+        if self.latest_uuid is None:
+            return "gone"
+        return f"superseded by {self.latest_uuid}"
+
+    @property
     def repo(self) -> pygit2.Repository:
         return self._repo
 
