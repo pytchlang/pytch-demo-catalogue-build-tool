@@ -111,10 +111,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
 
     @property
     def commit(self) -> pygit2.Commit:
-        repo_obj = self.repo[self.defining_commit_id]
-        if not isinstance(repo_obj, pygit2.Commit):
-            raise RuntimeError(f"id {self.defining_commit_id} did not give Commit")
-        return repo_obj
+        return self._commit(self.defining_commit_id)
 
     @property
     def tree(self) -> pygit2.Tree:
