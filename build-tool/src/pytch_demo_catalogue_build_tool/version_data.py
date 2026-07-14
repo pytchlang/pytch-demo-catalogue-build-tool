@@ -33,6 +33,7 @@ from .constants import DistPaths
 from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
+from .validate_catalogue import main as validate_catalogue_main
 
 UUID_FILENAME = "pytch-demo-uuid.txt"
 
@@ -566,3 +567,13 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
             locale_index_dicts = [asdict(entry) for entry in index_entries]
             json.dump(locale_index_dicts, f_index, indent=2)
             logger.info(f"wrote index for '{locale}'")
+
+    data_dir = Path(__file__).parent / "data"
+    spec_path = data_dir / "disco-demos-openapi.yaml"
+    if not spec_path.is_file():
+        logger.warning(
+            f"OpenAPI spec file '{spec_path}' does not exist;"
+            " unable to validate output"
+        )
+    else:
+        validate_catalogue_main(spec_path, dist_path)
