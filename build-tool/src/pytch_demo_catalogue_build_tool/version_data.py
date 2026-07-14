@@ -27,11 +27,13 @@ import sys
 from typing import Any, Generator, Optional
 
 import pygit2
+import colorlog
 
 from .constants import DistPaths
 from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
+from .validate_catalogue import main as validate_catalogue_main
 
 UUID_FILENAME = "pytch-demo-uuid.txt"
 
@@ -536,15 +538,26 @@ def gather_index_records(
 
 
 def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> None:
+    logger = colorlog.getLogger()
+
     discovered = pygit2.discover_repository(repo_path)
     if discovered is None:
         sys.stderr.write(f"No git repository found at {repo_path!r}\n")
         sys.exit(1)
     repo = pygit2.Repository(discovered)
 
-    records = Extractor(repo, start_ref).demo_major_version_records()
+    if repo.status():
+        logger.warning(f"repo workdir '{repo.workdir}' contains uncommitted changes")
+        for path_str in repo.status():
+            logger.info(f"- {path_str}")
+
+    records = DemoMajorVersionRecord.grouped_by_latest(
+        Extractor(repo, start_ref).demo_major_version_records()
+    )
+
     for r in records:
         r.write_dist_files(dist_path)
+        logger.info(f"wrote {r.pprint_str()}")
 
     index_entries_by_locale = gather_index_records(records)
     for locale, index_entries in index_entries_by_locale.items():
@@ -553,3 +566,14 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
         with (locale_index_dir / DistPaths.Index_File).open("wt") as f_index:
             locale_index_dicts = [asdict(entry) for entry in index_entries]
             json.dump(locale_index_dicts, f_index, indent=2)
+            logger.info(f"wrote index for '{locale}'")
+
+    data_dir = Path(__file__).parent / "data"
+    spec_path = data_dir / "disco-demos-openapi.yaml"
+    if not spec_path.is_file():
+        logger.warning(
+            f"OpenAPI spec file '{spec_path}' does not exist;"
+            " unable to validate output"
+        )
+    else:
+        validate_catalogue_main(spec_path, dist_path)

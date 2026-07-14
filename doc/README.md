@@ -269,6 +269,11 @@ TODOs.  Once the content of the `description.md` and `summary.md`
 files has been written, and the metadata filled in, the new files can
 all be committed to git.
 
+**You must commit the new files to git and then re-run the build tool
+for the new demo to show up in the catalogue in the app.  The build
+tool uses the git history, not the working directory, to build the
+catalogue.**
+
 ### Tool to update a demo
 
 ``` shell

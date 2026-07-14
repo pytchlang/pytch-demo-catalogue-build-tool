@@ -29,7 +29,7 @@ def log_level_option():
     return click.option(
         "--log-level",
         type=LogLevel(),
-        default="WARNING",
+        default="INFO",
         help="Set logging level",
         show_default=True,
     )
