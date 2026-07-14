@@ -204,6 +204,12 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         path = self.demo_root_path / constants.DemoRepoPaths.Global_Metadata_File
         return self.json_dict_within_commit(path)
 
+    @property
+    def effective_mtime_str(self) -> str:
+        mtime_commit = self._commit(self._effective_mtime_commit_id)
+        mtime = time.gmtime(mtime_commit.author.time)
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", mtime)
+
     def catalogue_entry(self, locale_code: str) -> CatalogueEntry:
         ctx = LocaleContext(self, locale_code)
 
