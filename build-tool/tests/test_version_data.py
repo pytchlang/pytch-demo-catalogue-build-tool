@@ -91,6 +91,17 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
                 f"({want['defined_at']})"
             )
 
+        # The "mtime commit" is the most recent change OTHER than just
+        # a "recommended" flip, so it can lag behind the "defining
+        # commit" (see `live` and `beacon`).
+        if "mtime_at" in want:
+            want_sha = built.commit_oids[want["mtime_at"]]
+            got_sha = extractor.effective_mtime_commits[uuid]
+            assert got_sha == want_sha, (
+                f"{alias}: mtime_at {got_sha} != {want_sha} "
+                f"({want['mtime_at']})"
+            )
+
         if "program_kind" in want:
             assert record.common_program_kind() == want["program_kind"], alias
 
@@ -152,11 +163,53 @@ def test_build_dist_marks_deleted_demo(
     # The index lists exactly the live demos: the named live ones plus every
     # generated bulk demo, and none of the deleted/superseded versions.
     listed = {e["uuid"] for e in dist_demos_index}
-    named_live = {history.uuid(a) for a in ("live", "superB", "mover", "descr")}
+    named_live = {
+        history.uuid(a) for a in ("live", "superB", "mover", "descr", "beacon")
+    }
     bulk_uuids = {d["uuid"] for d in bulk_demos(history.bulk)}
     assert listed == named_live | bulk_uuids
     for a in ("gone", "chainA", "chainB", "superA"):
         assert history.uuid(a) not in listed
+
+
+def test_served_last_updated_ignores_recommended_flip(
+    history: History, built: BuiltRepo, dist: Path
+) -> None:
+    """End to end, a demo's served ``lastUpdated`` is the time of its
+    latest *content* change, not of a later commit that only flips the
+    "recommended" flag.
+
+    ``live`` is added and, several commits later, undergoes a change
+    which only flips its "recommended" flag.  ``beacon`` is added,
+    gets a real content edit, and then has its "recommended" flag
+    flipped.  In both cases the flip is the most recent commit
+    touching the demo (so is the *defining* commit), but it must not
+    advance the mtime.
+    """
+    import time
+
+    def author_iso(commit_id: str) -> str:
+        commit = built.repo[built.commit_oids[commit_id]]
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(commit.author.time))
+
+    def served_last_updated(alias: str) -> str:
+        meta = json.loads(
+            (dist / history.uuid(alias) / "en" / "metadata.json").read_text()
+        )
+        return meta["lastUpdated"]
+
+    # Guard: each flip commit carries a different (later) timestamp than the
+    # content change whose time should survive.  Without this the two
+    # served-lastUpdated checks further down would pass even if lastUpdated
+    # tracked the flip, so ensure that the two times really do differ.
+    assert author_iso("toggle-live") != author_iso("add-live")
+    assert author_iso("recommend-beacon") != author_iso("edit-beacon")
+
+    # live: mtime stays at the add, ignoring the later recommended flip.
+    assert served_last_updated("live") == author_iso("add-live")
+
+    # beacon: mtime is the content edit, skipping the later recommended flip.
+    assert served_last_updated("beacon") == author_iso("edit-beacon")
 
 
 def _chapter_count(markdown: str) -> int:

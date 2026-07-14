@@ -26,6 +26,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     latest_uuid: Optional[str]
     _defining_commit_id: str
     _demo_root_path: Path
+    _effective_mtime_commit_id: str
     _present_at_head: bool
 
     @property
@@ -102,12 +103,15 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         """
         return self._present_at_head
 
+    def _commit(self, sha1: str) -> pygit2.Commit:
+        repo_obj = self.repo[sha1]
+        if not isinstance(repo_obj, pygit2.Commit):
+            raise RuntimeError(f"id {sha1} did not give Commit")
+        return repo_obj
+
     @property
     def commit(self) -> pygit2.Commit:
-        repo_obj = self.repo[self.defining_commit_id]
-        if not isinstance(repo_obj, pygit2.Commit):
-            raise RuntimeError(f"id {self.defining_commit_id} did not give Commit")
-        return repo_obj
+        return self._commit(self.defining_commit_id)
 
     @property
     def tree(self) -> pygit2.Tree:
@@ -200,14 +204,19 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         path = self.demo_root_path / constants.DemoRepoPaths.Global_Metadata_File
         return self.json_dict_within_commit(path)
 
+    @property
+    def effective_mtime_str(self) -> str:
+        mtime_commit = self._commit(self._effective_mtime_commit_id)
+        mtime = time.gmtime(mtime_commit.author.time)
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", mtime)
+
     def catalogue_entry(self, locale_code: str) -> CatalogueEntry:
         ctx = LocaleContext(self, locale_code)
 
         ZipfileMetadataKeys = constants.PytchZipfileMetadataKeys
         display_name = ctx.project_metadata[ZipfileMetadataKeys.Project_Name]
 
-        modify_time = self.commit.author.time
-        last_updated = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(modify_time))
+        last_updated = self.effective_mtime_str
 
         summary_markdown = self.text_within_commit(ctx.repo_summary_path)
 

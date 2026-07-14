@@ -58,6 +58,13 @@ class DemoSnapshot:
 
     uuid_file_path: str
     normalized_hash: str
+    full_hash: str
+
+    def effective_hash(self, normalise: bool) -> str:
+        return (
+            self.normalized_hash if normalise
+            else self.full_hash
+        )
 
 
 @dataclass
@@ -113,10 +120,23 @@ class Extractor:
         self.head_uuids: set[str] = set(self.commit_demos[tip_commit.id].keys())
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
-        self.defining_commits: dict[str, DefiningCommit] = self._find_defining_commits()
+
+        self.defining_commits: dict[str, DefiningCommit] \
+            = self._find_defining_commits(normalise_locale_metadata=False)
 
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
+
+        mtime_commits: dict[str, DefiningCommit] \
+            = self._find_defining_commits(normalise_locale_metadata=True)
+
+        if mtime_commits.keys() != self.all_uuids:
+            raise AssertionError("not every UUID has an mtime commit")
+
+        self.effective_mtime_commits: dict[str, int] = {
+            uuid: commit.sha1
+            for uuid, commit in mtime_commits.items()
+        }
 
     def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
         """Resolve the commit whose ancestry is analysed.
@@ -158,6 +178,7 @@ class Extractor:
                 self._latest_uuid(uuid),
                 (demo_commit := self.defining_commits[uuid]).sha1,
                 Path(demo_commit.uuid_file_path).parent,
+                self.effective_mtime_commits[uuid],
                 uuid in self.head_uuids,
             )
             for uuid in sorted_uuids
@@ -185,7 +206,14 @@ class Extractor:
             self.all_uuids.add(found.uuid)
             demos_here[found.uuid] = DemoSnapshot(
                 uuid_file_path=found.uuid_file_path,
-                normalized_hash=self._normalized_demo_hash(found.demo_tree),
+                normalized_hash=self._demo_hash(
+                    found.demo_tree,
+                    True,
+                ),
+                full_hash=self._demo_hash(
+                    found.demo_tree,
+                    False,
+                ),
             )
         self.commit_demos[commit.id] = demos_here
 
@@ -255,13 +283,19 @@ class Extractor:
                 yield from self._iter_demos(commit, entry_tree, sub_path)
 
     # ---------------------------------------------------------------
-    # Hashing a demo subtree with the ``recommended`` flag stripped
+    # Hashing a demo subtree, optionally with the ``recommended`` flag
+    # stripped
     # ---------------------------------------------------------------
 
-    def _normalized_demo_hash(self, demo_tree: pygit2.Tree) -> str:
-        """SHA-256 over the demo subtree, ignoring the ``recommended`` flag."""
+    def _demo_hash(
+            self,
+            demo_tree: pygit2.Tree,
+            normalise_locale_metadata: bool,
+    ) -> str:
+        """SHA-256 over the demo subtree, optionally ignoring the
+        ``recommended`` flag."""
         h = hashlib.sha256()
-        self._hash_tree(demo_tree, h, "")
+        self._hash_tree(demo_tree, h, "", normalise_locale_metadata)
         return h.hexdigest()
 
     def _hash_tree(
@@ -269,6 +303,7 @@ class Extractor:
         tree: pygit2.Tree,
         h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
         prefix: str,
+        normalise_locale_metadata: bool,
     ):
         for entry in sorted(tree, key=name_of_tree_entry):
             rel = f"{prefix}/{entry.name}" if prefix else name_of_tree_entry(entry)
@@ -276,8 +311,8 @@ class Extractor:
             h.update(rel.encode("utf-8"))
             if entry.type_str == "tree":
                 subtree: pygit2.Tree = entry  # type: ignore
-                self._hash_tree(subtree, h, rel)
-            elif _is_locale_metadata_path(rel):
+                self._hash_tree(subtree, h, rel, normalise_locale_metadata)
+            elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
                 if entry.type_str != "blob":
                     raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
 
@@ -377,13 +412,24 @@ class Extractor:
     # Finding the defining commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_defining_commits(self) -> dict[str, DefiningCommit]:
+    def _find_defining_commits(
+            self,
+            normalise_locale_metadata: bool,
+    ) -> dict[str, DefiningCommit]:
         """Find the unique most-recent modification commit for every UUID."""
         mod_commits: dict[str, list[pygit2.Commit]] = defaultdict(list)
         for commit in self.head_ancestry:
             demos_here = self.commit_demos[commit.id]
             for uuid, snapshot in demos_here.items():
-                if self._is_modification(commit, uuid, snapshot.normalized_hash):
+                effective_hash = snapshot.effective_hash(
+                    normalise_locale_metadata
+                )
+                if self._is_modification(
+                        commit,
+                        uuid,
+                        effective_hash,
+                        normalise_locale_metadata,
+                ):
                     mod_commits[uuid].append(commit)
 
         defining: dict[str, DefiningCommit] = {}
@@ -406,7 +452,14 @@ class Extractor:
                 # lexicographically largest SHA1).  If the content itself
                 # disagrees the state really is ambiguous and we raise,
                 # as the spec instructs.
-                hashes = {self.commit_demos[m.id][uuid].normalized_hash for m in maxima}
+                hashes = {
+                    (
+                        self
+                        .commit_demos[m.id][uuid]
+                        .effective_hash(normalise_locale_metadata)
+                    )
+                    for m in maxima
+                }
                 if len(hashes) > 1:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
@@ -424,7 +477,13 @@ class Extractor:
 
         return defining
 
-    def _is_modification(self, commit: pygit2.Commit, uuid: str, h: str) -> bool:
+    def _is_modification(
+            self,
+            commit: pygit2.Commit,
+            uuid: str,
+            h: str,
+            normalise_locale_metadata: bool,
+    ) -> bool:
         """True if ``commit`` updated the contents of demo ``uuid``.
 
         A commit is a "modification commit" for a demo if the demo exists
@@ -443,8 +502,12 @@ class Extractor:
             # HEAD-ancestor, so parent.id is always a key of commit_demos.
             parent_demos = self.commit_demos[parent.id]
             parent_snapshot = parent_demos.get(uuid)
-            if parent_snapshot is not None and parent_snapshot.normalized_hash == h:
-                return False
+            if parent_snapshot is not None:
+                parent_hash = parent_snapshot.effective_hash(
+                    normalise_locale_metadata
+                )
+                if parent_hash == h:
+                    return False
         return True
 
     def _topological_maxima(self, commits: list[pygit2.Commit]):
