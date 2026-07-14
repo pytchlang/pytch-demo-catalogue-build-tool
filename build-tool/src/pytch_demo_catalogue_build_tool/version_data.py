@@ -58,6 +58,7 @@ class DemoSnapshot:
 
     uuid_file_path: str
     normalized_hash: str
+    full_hash: str
 
 
 @dataclass
