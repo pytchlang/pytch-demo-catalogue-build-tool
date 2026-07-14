@@ -94,9 +94,11 @@ commits:
 
   - id: toggle-live
     branch: catalogue
-    message: "Flip the snake demo's recommended flag (must NOT count as a change)"
+    message: "Flip the snake demo's recommended flag (defining, but NOT mtime)"
     ops:
-      # Identical to add-live except the recommended flag.
+      # Identical to add-live except the recommended flag.  This
+      # becomes the snake demo's DEFINING commit -- but it should not
+      # advance the effective mtime, which stays at add-live.
       - {kind: put, demo: snake, uuid: live, programKind: per-method,
          description: "The snake demo", recommended: false}
 
@@ -188,16 +190,25 @@ commits:
 scenarios:
   - start_ref: catalogue
     expect:
-      live:   {latest: live,   present: true,  defined_at: add-live,
-               program_kind: per-method}
+      # `defined_at` is the most recent commit making ANY change to
+      # the demo (including just a "recommended" flip); `mtime_at` is
+      # the most recent change OTHER than just to the "recommended"
+      # flag.  The two differ exactly for the demos whose latest touch
+      # is a "recommended" flip: `live` (its mtime stays at the add)
+      # and `beacon` (mtime is content edit that precedes the flip).
+      live:   {latest: live,   present: true,  defined_at: toggle-live,
+               mtime_at: add-live, program_kind: per-method}
       superA: {latest: superB, present: false, defined_at: add-superA,
-               program_kind: flat}
-      superB: {latest: superB, present: true,  defined_at: supersede-super}
+               mtime_at: add-superA, program_kind: flat}
+      superB: {latest: superB, present: true,  defined_at: supersede-super,
+               mtime_at: supersede-super}
       gone:   {latest: null,   present: false}
       chainA: {latest: null,   present: false}
       chainB: {latest: null,   present: false}
-      mover:  {latest: mover,  present: true,  defined_at: add-mover}
-      descr:  {latest: descr,  present: true,  defined_at: reword-story}
+      mover:  {latest: mover,  present: true,  defined_at: add-mover,
+               mtime_at: add-mover}
+      descr:  {latest: descr,  present: true,  defined_at: reword-story,
+               mtime_at: reword-story}
 
   - start_ref: ambiguous
     expect_error: true
