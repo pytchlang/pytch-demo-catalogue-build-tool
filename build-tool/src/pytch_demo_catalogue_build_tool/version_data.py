@@ -255,13 +255,19 @@ class Extractor:
                 yield from self._iter_demos(commit, entry_tree, sub_path)
 
     # ---------------------------------------------------------------
-    # Hashing a demo subtree with the ``recommended`` flag stripped
+    # Hashing a demo subtree, optionally with the ``recommended`` flag
+    # stripped
     # ---------------------------------------------------------------
 
-    def _normalized_demo_hash(self, demo_tree: pygit2.Tree) -> str:
-        """SHA-256 over the demo subtree, ignoring the ``recommended`` flag."""
+    def _demo_hash(
+            self,
+            demo_tree: pygit2.Tree,
+            normalise_locale_metadata: bool,
+    ) -> str:
+        """SHA-256 over the demo subtree, optionally ignoring the
+        ``recommended`` flag."""
         h = hashlib.sha256()
-        self._hash_tree(demo_tree, h, "")
+        self._hash_tree(demo_tree, h, "", normalise_locale_metadata)
         return h.hexdigest()
 
     def _hash_tree(
@@ -269,6 +275,7 @@ class Extractor:
         tree: pygit2.Tree,
         h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
         prefix: str,
+        normalise_locale_metadata: bool,
     ):
         for entry in sorted(tree, key=name_of_tree_entry):
             rel = f"{prefix}/{entry.name}" if prefix else name_of_tree_entry(entry)
@@ -276,8 +283,8 @@ class Extractor:
             h.update(rel.encode("utf-8"))
             if entry.type_str == "tree":
                 subtree: pygit2.Tree = entry  # type: ignore
-                self._hash_tree(subtree, h, rel)
-            elif _is_locale_metadata_path(rel):
+                self._hash_tree(subtree, h, rel, normalise_locale_metadata)
+            elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
                 if entry.type_str != "blob":
                     raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
 
