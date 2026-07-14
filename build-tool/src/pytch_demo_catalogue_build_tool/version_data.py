@@ -445,7 +445,13 @@ class Extractor:
 
         return defining
 
-    def _is_modification(self, commit: pygit2.Commit, uuid: str, h: str) -> bool:
+    def _is_modification(
+            self,
+            commit: pygit2.Commit,
+            uuid: str,
+            h: str,
+            normalise_locale_metadata: bool,
+    ) -> bool:
         """True if ``commit`` updated the contents of demo ``uuid``.
 
         A commit is a "modification commit" for a demo if the demo exists
@@ -464,8 +470,12 @@ class Extractor:
             # HEAD-ancestor, so parent.id is always a key of commit_demos.
             parent_demos = self.commit_demos[parent.id]
             parent_snapshot = parent_demos.get(uuid)
-            if parent_snapshot is not None and parent_snapshot.normalized_hash == h:
-                return False
+            if parent_snapshot is not None:
+                parent_hash = parent_snapshot.effective_hash(
+                    normalise_locale_metadata
+                )
+                if parent_hash == h:
+                    return False
         return True
 
     def _topological_maxima(self, commits: list[pygit2.Commit]):
