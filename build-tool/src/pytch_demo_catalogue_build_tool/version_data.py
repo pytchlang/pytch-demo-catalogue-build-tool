@@ -556,6 +556,7 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
 
     for r in records:
         r.write_dist_files(dist_path)
+        logger.info(f"wrote {r.pprint_str()}")
 
     index_entries_by_locale = gather_index_records(records)
     for locale, index_entries in index_entries_by_locale.items():
@@ -564,3 +565,4 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
         with (locale_index_dir / DistPaths.Index_File).open("wt") as f_index:
             locale_index_dicts = [asdict(entry) for entry in index_entries]
             json.dump(locale_index_dicts, f_index, indent=2)
+            logger.info(f"wrote index for '{locale}'")
