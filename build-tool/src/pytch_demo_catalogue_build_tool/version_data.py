@@ -186,7 +186,14 @@ class Extractor:
             self.all_uuids.add(found.uuid)
             demos_here[found.uuid] = DemoSnapshot(
                 uuid_file_path=found.uuid_file_path,
-                normalized_hash=self._normalized_demo_hash(found.demo_tree),
+                normalized_hash=self._demo_hash(
+                    found.demo_tree,
+                    True,
+                ),
+                full_hash=self._demo_hash(
+                    found.demo_tree,
+                    False,
+                ),
             )
         self.commit_demos[commit.id] = demos_here
 
