@@ -61,8 +61,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-import click
 import yaml
+import colorlog
 from jsonschema import Draft202012Validator, FormatChecker
 
 PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
@@ -410,15 +410,19 @@ def main(spec: Path, content_dir: Path) -> None:
 
     Every language found under index/ is validated.
     """
+    logger = colorlog.getLogger()
+
     report = validate(spec, content_dir)
 
     if report.errors:
-        click.echo(f"FAILED — {len(report.errors)} problem(s):", err=True)
+        logger.error(
+            f"catalogue '{content_dir}' has {len(report.errors)} problem(s):"
+        )
         for err in report.errors:
-            click.echo(f"  - {err}", err=True)
+            logger.error(f"- {err}")
         raise SystemExit(1)
 
-    click.echo("OK — catalogue conforms to the OpenAPI contract.")
+    logger.info("catalogue OK vs spec")
 
 
 if __name__ == "__main__":
