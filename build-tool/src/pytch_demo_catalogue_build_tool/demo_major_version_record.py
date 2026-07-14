@@ -216,8 +216,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         ZipfileMetadataKeys = constants.PytchZipfileMetadataKeys
         display_name = ctx.project_metadata[ZipfileMetadataKeys.Project_Name]
 
-        modify_time = self.commit.author.time
-        last_updated = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(modify_time))
+        last_updated = self.effective_mtime_str
 
         summary_markdown = self.text_within_commit(ctx.repo_summary_path)
 
