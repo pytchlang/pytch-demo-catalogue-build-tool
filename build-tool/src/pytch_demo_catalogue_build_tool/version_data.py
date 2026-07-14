@@ -60,6 +60,12 @@ class DemoSnapshot:
     normalized_hash: str
     full_hash: str
 
+    def effective_hash(self, normalise: bool) -> str:
+        return (
+            self.normalized_hash if normalise
+            else self.full_hash
+        )
+
 
 @dataclass
 class DefiningCommit:
