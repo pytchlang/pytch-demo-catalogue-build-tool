@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+from collections import defaultdict
 import json
 from pathlib import Path
 import time
@@ -46,6 +47,36 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             return "1"
         else:
             return f"0-{self.uuid}"
+
+    @staticmethod
+    def grouped_by_latest(
+            records: list["DemoMajorVersionRecord"]
+    ) -> list["DemoMajorVersionRecord"]:
+        records_by_latest = defaultdict(list)
+        for record in records:
+            records_by_latest[record.latest_uuid].append(record)
+
+        for uuid_records in records_by_latest.values():
+            uuid_records.sort(
+                key=DemoMajorVersionRecord.within_group_sort_key
+            )
+
+        # When sorting, map "None" as a latest-uuid (i.e., deleted
+        # demos) to appear first.
+        latest_with_records = sorted(
+            records_by_latest.items(),
+            key=lambda kv: kv[0] or ""
+        )
+
+        grouped_records = []
+        for _latest_uuid, group in latest_with_records:
+            grouped_records.extend(group)
+
+        start_uuids = set(r.uuid for r in records)
+        final_uuids = set(r.uuid for r in grouped_records)
+        assert start_uuids == final_uuids
+
+        return grouped_records
 
     @property
     def repo(self) -> pygit2.Repository:
