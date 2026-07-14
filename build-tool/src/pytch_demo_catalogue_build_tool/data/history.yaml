@@ -31,6 +31,7 @@ uuids:
   chainB: "66666666-6666-4666-8666-666666666666"
   mover:  "77777777-7777-4777-8777-777777777777"
   descr:  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+  beacon: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
   ambV1:  "88888888-8888-4888-8888-888888888888"
   ambV2:  "99999999-9999-4999-8999-999999999999"
 
@@ -116,6 +117,37 @@ commits:
     message: "Reorganise: move the rover demo (must NOT count as a change)"
     ops:
       - {kind: move, from: rover, to: animations/rover}
+
+  - id: add-beacon
+    branch: catalogue
+    message: "Add the beacon demo"
+    ops:
+      # Explicit description so the later content edit is a real change and
+      # the recommended-only flip after it is not.
+      - {kind: put, demo: beacon, uuid: beacon, programKind: flat,
+         description: "The beacon demo, v1"}
+
+  - id: edit-beacon
+    branch: catalogue
+    message: "Edit the beacon demo's description (a content change)"
+    ops:
+      # A true content change (new description text and an extra
+      # chapter) relative to add-beacon, so this is both the defining
+      # and the effective-mtime commit -- until recommend-beacon takes
+      # over the former but not the latter.
+      - {kind: put, demo: beacon, uuid: beacon, programKind: flat,
+         description: "The beacon demo, v2", chapters: 2}
+
+  - id: recommend-beacon
+    branch: catalogue
+    message: "Flip the beacon demo's recommended flag (defining, but NOT mtime)"
+    ops:
+      # Same content as edit-beacon (same description and chapters);
+      # only the "recommended" flag differs.  So this becomes the
+      # DEFINING commit, but it should not advance the effective
+      # modification time, which stays at edit-beacon.
+      - {kind: put, demo: beacon, uuid: beacon, programKind: flat,
+         description: "The beacon demo, v2", chapters: 2, recommended: false}
 
   - id: add-story
     branch: catalogue
@@ -209,6 +241,8 @@ scenarios:
                mtime_at: add-mover}
       descr:  {latest: descr,  present: true,  defined_at: reword-story,
                mtime_at: reword-story}
+      beacon: {latest: beacon, present: true,  defined_at: recommend-beacon,
+               mtime_at: edit-beacon, program_kind: flat}
 
   - start_ref: ambiguous
     expect_error: true
