@@ -398,13 +398,24 @@ class Extractor:
     # Finding the defining commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_defining_commits(self) -> dict[str, DefiningCommit]:
+    def _find_defining_commits(
+            self,
+            normalise_locale_metadata: bool,
+    ) -> dict[str, DefiningCommit]:
         """Find the unique most-recent modification commit for every UUID."""
         mod_commits: dict[str, list[pygit2.Commit]] = defaultdict(list)
         for commit in self.head_ancestry:
             demos_here = self.commit_demos[commit.id]
             for uuid, snapshot in demos_here.items():
-                if self._is_modification(commit, uuid, snapshot.normalized_hash):
+                effective_hash = snapshot.effective_hash(
+                    normalise_locale_metadata
+                )
+                if self._is_modification(
+                        commit,
+                        uuid,
+                        effective_hash,
+                        normalise_locale_metadata,
+                ):
                     mod_commits[uuid].append(commit)
 
         defining: dict[str, DefiningCommit] = {}
@@ -427,7 +438,14 @@ class Extractor:
                 # lexicographically largest SHA1).  If the content itself
                 # disagrees the state really is ambiguous and we raise,
                 # as the spec instructs.
-                hashes = {self.commit_demos[m.id][uuid].normalized_hash for m in maxima}
+                hashes = {
+                    (
+                        self
+                        .commit_demos[m.id][uuid]
+                        .effective_hash(normalise_locale_metadata)
+                    )
+                    for m in maxima
+                }
                 if len(hashes) > 1:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
