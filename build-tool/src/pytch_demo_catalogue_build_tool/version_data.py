@@ -27,6 +27,7 @@ import sys
 from typing import Any, Generator, Optional
 
 import pygit2
+import colorlog
 
 from .constants import DistPaths
 from .demo_catalogue_entry import CatalogueEntry, IndexRecord
@@ -536,11 +537,18 @@ def gather_index_records(
 
 
 def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> None:
+    logger = colorlog.getLogger()
+
     discovered = pygit2.discover_repository(repo_path)
     if discovered is None:
         sys.stderr.write(f"No git repository found at {repo_path!r}\n")
         sys.exit(1)
     repo = pygit2.Repository(discovered)
+
+    if repo.status():
+        logger.warning(f"repo workdir '{repo.workdir}' contains uncommitted changes")
+        for path_str in repo.status():
+            logger.info(f"- {path_str}")
 
     records = Extractor(repo, start_ref).demo_major_version_records()
     for r in records:
