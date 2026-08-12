@@ -43,6 +43,9 @@ class DemoRepoPaths:
         # Content.
         Content_Dir = Path("content")
 
+        # Assets used in content.
+        ContentAssets_Dir = Path("content/assets")
+
         # Short (summary) markdown.
         Summary_File = Path("summary.md")
 
@@ -77,6 +80,9 @@ class DistPaths:
 
         # Content.
         Content_Dir = DemoRepoPaths.LocaleContent.Content_Dir
+
+        # Assets used in content.
+        ContentAssets_Dir = DemoRepoPaths.LocaleContent.ContentAssets_Dir
 
         # Short (summary) markdown.
         Summary_File = DemoRepoPaths.LocaleContent.Summary_File
