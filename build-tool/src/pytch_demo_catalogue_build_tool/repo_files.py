@@ -41,6 +41,37 @@ def tree_entry_within_commit(
     return entry  # type: ignore
 
 
+def maybe_tree_entry_within_commit(
+    repo: pygit2.Repository, commit_id: str, path: Path
+) -> pygit2.Tree | pygit2.Blob | None:
+    if (commit := repo.get(commit_id)) is None:
+        raise KeyError(f"commit {commit_id} not found in repo")
+
+    entry: pygit2.Tree | pygit2.Blob = commit.tree
+    n_parts = len(path.parts)
+    for idx, path_part in enumerate(path.parts):
+        is_last = idx == n_parts - 1
+        try:
+            next_entry = entry / path_part  # type: ignore
+        except KeyError:
+            if is_last:
+                return None
+            raise RuntimeError(
+                f'"{path_part}" not found in "{"/".join(path.parts[:idx])}"'
+                f" within tree of commit {commit_id}"
+            )
+        entry_type: str = next_entry.type_str  # type: ignore
+        if not is_last and entry_type != "tree":
+            raise RuntimeError(
+                f'expecting "tree" at posn {idx} in path'
+                f' when processing "{path}" within tree of commit {commit_id}'
+                f' but found "{entry_type}"'
+            )
+        entry = next_entry  # type: ignore
+
+    return entry  # type: ignore
+
+
 def file_within_commit(repo: pygit2.Repository, commit_id: str, path: Path) -> bytes:
     blob: pygit2.Blob = tree_entry_within_commit(repo, commit_id, path, "blob")  # type: ignore
     return blob.data
