@@ -64,8 +64,8 @@ In the rest of this section, we'll refer to that directory as
       image format.  Exactly one image file should be present.
 
     * `$DEMO_ROOT/by-locale/en/content/thumbnail.mp4` — **Optional**
-      480×360 video.  Other video formats are OK too.  At most one
-      video file should be present.
+      480×360 video.  Other video formats besides MP4 are OK too.  At
+      most one video file should be present.
 
     * `$DEMO_ROOT/by-locale/en/content/assets/` — **Optional.  Work in
       progress.**  Directory containing any images, videos, etc.,
@@ -236,6 +236,9 @@ poetry run -P build-tool build-dist --log-level=INFO \
     "$DEMO_CATALOGUE_REPO_ROOT" "$DEMO_CATALOGUE_REPO_ROOT"/dist
 ```
 
+The resulting directory is suitable for deployment (e.g., via
+`rsync`).
+
 ### Tool to create a new demo
 
 A common use case is that a demo author has created, in Pytch, a
@@ -303,3 +306,20 @@ poetry run -P build-tool validate-catalogue --help
 ```
 
 for details.  Also used internally by unit tests.
+
+The tool needs to read a YAML specification of the expected structure
+to perform full validation.  That YAML file lives in the
+`pytch-webapp` repository, under the path
+
+``` shell
+tools/disco-demos-openapi.yaml
+```
+
+and a symlink to this file should exist in this
+`pytch-demo-catalogue-build-tool` repo at the path
+
+``` shell
+build-tool/src/pytch_demo_catalogue_build_tool/data/disco-demos-openapi.yaml
+```
+
+The top-level `develop.sh` script should have set this up.
