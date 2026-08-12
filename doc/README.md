@@ -236,6 +236,9 @@ poetry run -P build-tool build-dist --log-level=INFO \
     "$DEMO_CATALOGUE_REPO_ROOT" "$DEMO_CATALOGUE_REPO_ROOT"/dist
 ```
 
+The resulting directory is suitable for deployment (e.g., via
+`rsync`).
+
 ### Tool to create a new demo
 
 A common use case is that a demo author has created, in Pytch, a
