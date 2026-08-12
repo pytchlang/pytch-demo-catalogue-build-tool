@@ -308,6 +308,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                 description.md
                 thumbnail.jpg (**)
                 thumbnail.mp4 (**)
+                assets/  [if present, and everything under it]
         ```
 
         where the files marked (**) are only included if `self` is the
