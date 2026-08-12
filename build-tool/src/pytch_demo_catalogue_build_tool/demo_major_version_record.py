@@ -13,6 +13,7 @@ from . import constants
 from .demo_locale_context import MultiLocaleDemo, LocaleContext
 from .repo_files import (
     name_of_tree_entry,
+    tree_entry_within_commit,
     file_within_commit,
     json_within_commit,
     text_within_commit,
@@ -273,6 +274,19 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                         f" commit {self.defining_commit_id}"
                         f' but found "{entry_type}"'
                     )
+
+    def copy_tree(self, repo_path: Path, dist_path: Path) -> None:
+        """Recursively copy a directory out of this demo's defining commit.
+
+        Everything under the tree `repo_path` within the tree of the
+        defining commit is written to the directory `dist_path`, which
+        is created (along with any missing parents) if it does not
+        already exist.
+        """
+        tree: pygit2.Tree = tree_entry_within_commit(  # type: ignore
+            self.repo, self.defining_commit_id, repo_path, "tree"
+        )
+        self._copy_tree_entries(tree, repo_path, dist_path)
 
     def write_locale_dist_files(self, dist_demo_root: Path, locale_code: str) -> None:
         """
