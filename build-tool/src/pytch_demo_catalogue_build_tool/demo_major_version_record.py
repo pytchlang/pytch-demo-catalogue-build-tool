@@ -44,7 +44,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             f"{self.uuid} {self._demo_root_path} ({self.status_str})"
         )
 
-    def within_group_sort_key(self):
+    def within_group_sort_key(self) -> str:
         # Make the latest version sort after any earlier version.
         if self._present_at_head:
             return "1"
@@ -55,7 +55,9 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     def grouped_by_latest(
             records: list["DemoMajorVersionRecord"]
     ) -> list["DemoMajorVersionRecord"]:
-        records_by_latest = defaultdict(list)
+        records_by_latest: defaultdict[
+            Optional[str], list["DemoMajorVersionRecord"]
+        ] = defaultdict(list)
         for record in records:
             records_by_latest[record.latest_uuid].append(record)
 
@@ -71,7 +73,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             key=lambda kv: kv[0] or ""
         )
 
-        grouped_records = []
+        grouped_records: list["DemoMajorVersionRecord"] = []
         for _latest_uuid, group in latest_with_records:
             grouped_records.extend(group)
 
