@@ -60,6 +60,13 @@ class LocaleContext:
         return self.repo_locale_root / constants.DemoRepoPaths.LocaleContent.Content_Dir
 
     @property
+    def repo_content_assets_tree_path(self) -> Path:
+        return (
+            self.repo_locale_root
+            / constants.DemoRepoPaths.LocaleContent.ContentAssets_Dir
+        )
+
+    @property
     def repo_metadata_path(self) -> Path:
         return (
             self.repo_locale_root / constants.DemoRepoPaths.LocaleContent.Metadata_File
