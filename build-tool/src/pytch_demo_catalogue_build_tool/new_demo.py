@@ -24,7 +24,7 @@ class PlaceholderMetadata:
 def main(demo_dir: Path, locale: str, project_zipfile: Path):
     locales_dir = demo_dir / DemoRepoPaths.Locales_Dir
     if not demo_dir.exists():
-        demo_dir.mkdir()
+        demo_dir.mkdir(parents=True)
         with (demo_dir / DemoRepoPaths.Global_Metadata_File).open("wt") as f_meta:
             json.dump(PlaceholderMetadata.Global, f_meta, indent=2)
         with (demo_dir / DemoRepoPaths.Uuid_File).open("wt") as f_uuid:
