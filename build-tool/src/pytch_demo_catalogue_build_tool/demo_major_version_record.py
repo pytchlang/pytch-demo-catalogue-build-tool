@@ -17,6 +17,7 @@ from .repo_files import (
     file_within_commit,
     json_within_commit,
     text_within_commit,
+    maybe_tree_entry_within_commit,
 )
 
 
@@ -331,6 +332,14 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         # Copy "description" and "summary" markdown files.
         description_path = dist_content_dir / LocaleContent.Description_File
         description_path.write_bytes(ctx.repo_description_data)
+
+        assets_path = ctx.repo_content_assets_tree_path
+        assets_tree = maybe_tree_entry_within_commit(
+            self.repo, self.defining_commit_id, assets_path
+        )
+        if assets_tree is not None and assets_tree.type_str == "tree":
+            dest_path = dist_locale_root_dir / LocaleContent.ContentAssets_Dir
+            self.copy_tree(assets_path, dest_path)
 
         # TODO: Assets used in "description" markdown.
 
