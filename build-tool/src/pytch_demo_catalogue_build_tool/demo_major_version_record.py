@@ -250,6 +250,30 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         data = self.file_within_commit(repo_path)
         dist_path.write_bytes(data)
 
+    def _copy_tree_entries(
+        self, tree: pygit2.Tree, repo_path: Path, dist_path: Path
+    ) -> None:
+        dist_path.mkdir(parents=True, exist_ok=True)
+        for entry in tree:
+            name = name_of_tree_entry(entry)
+            entry_dist_path = dist_path / name
+            match entry.type_str:
+                case "tree":
+                    entry_tree: pygit2.Tree = entry  # type: ignore
+                    self._copy_tree_entries(
+                        entry_tree, repo_path / name, entry_dist_path
+                    )
+                case "blob":
+                    entry_blob: pygit2.Blob = entry  # type: ignore
+                    entry_dist_path.write_bytes(entry_blob.data)
+                case entry_type:
+                    raise RuntimeError(
+                        f'expecting "tree" or "blob" for "{name}"'
+                        f' in "{repo_path}" within tree of'
+                        f" commit {self.defining_commit_id}"
+                        f' but found "{entry_type}"'
+                    )
+
     def write_locale_dist_files(self, dist_demo_root: Path, locale_code: str) -> None:
         """
         Write files within the directory
