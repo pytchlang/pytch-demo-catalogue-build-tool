@@ -44,6 +44,13 @@ def tree_entry_within_commit(
 def maybe_tree_entry_within_commit(
     repo: pygit2.Repository, commit_id: str, path: Path
 ) -> pygit2.Tree | pygit2.Blob | None:
+    """Return entry at `path` from the tree of commit `commit_id`.
+
+    Every component of `path` other than the last must name a tree.  If
+    one does not exist, or is not a tree, RuntimeError is raised.  The
+    entry named by the last component need not exist, in which case None
+    is returned.
+    """
     if (commit := repo.get(commit_id)) is None:
         raise KeyError(f"commit {commit_id} not found in repo")
 
