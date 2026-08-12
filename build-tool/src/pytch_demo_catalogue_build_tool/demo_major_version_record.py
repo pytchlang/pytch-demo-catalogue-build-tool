@@ -13,9 +13,11 @@ from . import constants
 from .demo_locale_context import MultiLocaleDemo, LocaleContext
 from .repo_files import (
     name_of_tree_entry,
+    tree_entry_within_commit,
     file_within_commit,
     json_within_commit,
     text_within_commit,
+    maybe_tree_entry_within_commit,
 )
 
 
@@ -42,7 +44,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             f"{self.uuid} {self._demo_root_path} ({self.status_str})"
         )
 
-    def within_group_sort_key(self):
+    def within_group_sort_key(self) -> str:
         # Make the latest version sort after any earlier version.
         if self._present_at_head:
             return "1"
@@ -53,7 +55,9 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     def grouped_by_latest(
             records: list["DemoMajorVersionRecord"]
     ) -> list["DemoMajorVersionRecord"]:
-        records_by_latest = defaultdict(list)
+        records_by_latest: defaultdict[
+            Optional[str], list["DemoMajorVersionRecord"]
+        ] = defaultdict(list)
         for record in records:
             records_by_latest[record.latest_uuid].append(record)
 
@@ -69,7 +73,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
             key=lambda kv: kv[0] or ""
         )
 
-        grouped_records = []
+        grouped_records: list["DemoMajorVersionRecord"] = []
         for _latest_uuid, group in latest_with_records:
             grouped_records.extend(group)
 
@@ -250,6 +254,43 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         data = self.file_within_commit(repo_path)
         dist_path.write_bytes(data)
 
+    def _copy_tree_entries(
+        self, tree: pygit2.Tree, repo_path: Path, dist_path: Path
+    ) -> None:
+        dist_path.mkdir(parents=True, exist_ok=True)
+        for entry in tree:
+            name = name_of_tree_entry(entry)
+            entry_dist_path = dist_path / name
+            match entry.type_str:
+                case "tree":
+                    entry_tree: pygit2.Tree = entry  # type: ignore
+                    self._copy_tree_entries(
+                        entry_tree, repo_path / name, entry_dist_path
+                    )
+                case "blob":
+                    entry_blob: pygit2.Blob = entry  # type: ignore
+                    entry_dist_path.write_bytes(entry_blob.data)
+                case entry_type:
+                    raise RuntimeError(
+                        f'expecting "tree" or "blob" for "{name}"'
+                        f' in "{repo_path}" within tree of'
+                        f" commit {self.defining_commit_id}"
+                        f' but found "{entry_type}"'
+                    )
+
+    def copy_tree(self, repo_path: Path, dist_path: Path) -> None:
+        """Recursively copy a directory out of this demo's defining commit.
+
+        Everything under the tree `repo_path` within the tree of the
+        defining commit is written to the directory `dist_path`, which
+        is created (along with any missing parents) if it does not
+        already exist.
+        """
+        tree: pygit2.Tree = tree_entry_within_commit(  # type: ignore
+            self.repo, self.defining_commit_id, repo_path, "tree"
+        )
+        self._copy_tree_entries(tree, repo_path, dist_path)
+
     def write_locale_dist_files(self, dist_demo_root: Path, locale_code: str) -> None:
         """
         Write files within the directory
@@ -269,6 +310,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                 description.md
                 thumbnail.jpg (**)
                 thumbnail.mp4 (**)
+                assets/  [if present, and everything under it]
         ```
 
         where the files marked (**) are only included if `self` is the
@@ -293,6 +335,14 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         # Copy "description" and "summary" markdown files.
         description_path = dist_content_dir / LocaleContent.Description_File
         description_path.write_bytes(ctx.repo_description_data)
+
+        assets_path = ctx.repo_content_assets_tree_path
+        assets_tree = maybe_tree_entry_within_commit(
+            self.repo, self.defining_commit_id, assets_path
+        )
+        if assets_tree is not None and assets_tree.type_str == "tree":
+            dest_path = dist_locale_root_dir / LocaleContent.ContentAssets_Dir
+            self.copy_tree(assets_path, dest_path)
 
         # TODO: Assets used in "description" markdown.
 
