@@ -27,6 +27,7 @@ def main(demo_dir: Path, locale: str, project_zipfile: Path):
         demo_dir.mkdir(parents=True)
         with (demo_dir / DemoRepoPaths.Global_Metadata_File).open("wt") as f_meta:
             json.dump(PlaceholderMetadata.Global, f_meta, indent=2)
+            f_meta.write("\n")
         with (demo_dir / DemoRepoPaths.Uuid_File).open("wt") as f_uuid:
             f_uuid.write(f"{uuid.uuid4()}\n")
         locales_dir.mkdir()
@@ -40,6 +41,7 @@ def main(demo_dir: Path, locale: str, project_zipfile: Path):
     local_metadata_path = new_locale_dir / DemoRepoPaths.LocaleContent.Metadata_File
     with local_metadata_path.open("wt") as f_meta:
         json.dump(PlaceholderMetadata.Locale, f_meta, indent=2)
+        f_meta.write("\n")
 
     content_dir = new_locale_dir / DemoRepoPaths.LocaleContent.Content_Dir
     content_dir.mkdir()
