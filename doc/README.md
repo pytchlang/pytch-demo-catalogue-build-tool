@@ -306,3 +306,20 @@ poetry run -P build-tool validate-catalogue --help
 ```
 
 for details.  Also used internally by unit tests.
+
+The tool needs to read a YAML specification of the expected structure
+to perform full validation.  That YAML file lives in the
+`pytch-webapp` repository, under the path
+
+``` shell
+tools/disco-demos-openapi.yaml
+```
+
+and a symlink to this file should exist in this
+`pytch-demo-catalogue-build-tool` repo at the path
+
+``` shell
+build-tool/src/pytch_demo_catalogue_build_tool/data/disco-demos-openapi.yaml
+```
+
+The top-level `develop.sh` script should have set this up.
