@@ -164,8 +164,9 @@ def tree_entry_within_commit(
 ) -> pygit2.Tree | pygit2.Blob:
     """Return entry at `path` from the tree of commit `commit_id`.
 
-    The entry named by the last component of `path` must exist and be of
-    type `exp_type`.  RuntimeError is raised if not.
+    The entry named by the last component of `path` must exist (after
+    following any symlink) and be of type `exp_type`.  RuntimeError is
+    raised if not.
     """
     entry = maybe_tree_entry_within_commit(repo, commit_id, path)
 
