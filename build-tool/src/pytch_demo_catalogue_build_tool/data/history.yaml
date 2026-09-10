@@ -33,6 +33,7 @@ uuids:
   mover:  "77777777-7777-4777-8777-777777777777"
   descr:  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
   beacon: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  poly:   "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
   ambV1:  "88888888-8888-4888-8888-888888888888"
   ambV2:  "99999999-9999-4999-8999-999999999999"
 
@@ -150,6 +151,19 @@ commits:
       - {kind: put, demo: beacon, uuid: beacon, programKind: flat,
          description: "The beacon demo, v2", chapters: 2, recommended: false}
 
+  - id: add-polyglot
+    branch: catalogue
+    message: "Add a demo with content assets, in two locales"
+    ops:
+      # Two locales, where `ga` shares each of `en`'s content assets and
+      # project asset files by symlink rather than duplicating them, as
+      # doc/README.md describes.  The build tool has to follow those
+      # links when writing the dist and the project zipfile.  A
+      # per-method program, since only that template has an asset file
+      # to share.
+      - {kind: put, demo: polyglot, uuid: poly, programKind: per-method,
+         locales: [en, ga], assets: true}
+
   - id: add-story
     branch: catalogue
     message: "Add the story demo"
@@ -244,6 +258,8 @@ scenarios:
                mtime_at: reword-story}
       beacon: {latest: beacon, present: true,  defined_at: recommend-beacon,
                mtime_at: edit-beacon, program_kind: flat}
+      poly:   {latest: poly,   present: true,  defined_at: add-polyglot,
+               mtime_at: add-polyglot, program_kind: per-method}
 
   - start_ref: ambiguous
     expect_error: true
