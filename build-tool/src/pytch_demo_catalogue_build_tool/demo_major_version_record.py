@@ -13,6 +13,7 @@ from . import constants
 from .demo_locale_context import MultiLocaleDemo, LocaleContext
 from .repo_files import (
     name_of_tree_entry,
+    entry_is_symlink,
     tree_entry_within_commit,
     file_within_commit,
     json_within_commit,
@@ -267,6 +268,11 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
                     self._copy_tree_entries(
                         entry_tree, repo_path / name, entry_dist_path
                     )
+                case "blob" if entry_is_symlink(entry):
+                    # The dist is served as plain files, so a symlink in
+                    # the repo (used to share, say, one image between
+                    # locales) is written out as a copy of its target.
+                    self.copy_file(repo_path / name, entry_dist_path)
                 case "blob":
                     entry_blob: pygit2.Blob = entry  # type: ignore
                     entry_dist_path.write_bytes(entry_blob.data)
