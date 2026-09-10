@@ -59,6 +59,47 @@ def _symlink_target_path(link_path: Path, target: str) -> Path:
     return Path(resolved)
 
 
+def _symlink_target_within_commit(
+    repo: pygit2.Repository,
+    commit_id: str,
+    link_path: Path,
+    link_blob: pygit2.Blob,
+    hops_left: int,
+) -> pygit2.Blob:
+    """The file (blob) to which the symlink at `link_path` points.
+
+    Only symlinks to files are followed (a chain of them, if need be);
+    one naming a directory is an error, as is one whose target is not
+    within the repo, or does not exist.
+    """
+    if hops_left == 0:
+        raise RuntimeError(
+            f'too many symlinks followed from "{link_path}"'
+            f" within tree of commit {commit_id}"
+        )
+
+    target = link_blob.data.decode("utf-8")
+    entry = maybe_tree_entry_within_commit(
+        repo, commit_id, _symlink_target_path(link_path, target), hops_left - 1
+    )
+
+    if entry is None:
+        raise RuntimeError(
+            f'target "{target}" of symlink "{link_path}" not found'
+            f" within tree of commit {commit_id}"
+        )
+
+    entry_type: str = entry.type_str
+    if entry_type != "blob":
+        raise RuntimeError(
+            f'target "{target}" of symlink "{link_path}" is a "{entry_type}"'
+            f" within tree of commit {commit_id};"
+            " only symlinks to files are followed"
+        )
+
+    return entry  # type: ignore
+
+
 def maybe_tree_entry_within_commit(
     repo: pygit2.Repository, commit_id: str, path: Path
 ) -> pygit2.Tree | pygit2.Blob | None:
