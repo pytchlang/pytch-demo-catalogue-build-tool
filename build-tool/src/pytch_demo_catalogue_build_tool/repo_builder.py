@@ -26,6 +26,7 @@ inspection::
 from __future__ import annotations
 
 import json
+import posixpath
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -167,6 +168,16 @@ class FileState:
 
         def put(rel: str, data: bytes) -> None:
             self._files[f"{demo_root}/{rel}"] = data
+
+        def put_link(rel: str, target_rel: str) -> None:
+            """Symlink the file `rel` at `target_rel`.
+
+            Both are given relative to the demo root, and the link text
+            is derived from them, so it is relative to the directory
+            holding the link, as git (and the filesystem) require.
+            """
+            target = posixpath.relpath(target_rel, posixpath.dirname(rel))
+            self._files[f"{demo_root}/{rel}"] = Symlink(target)
 
         put("pytch-demo-uuid.txt", f"{spec.uuid}\n".encode())
         put(
