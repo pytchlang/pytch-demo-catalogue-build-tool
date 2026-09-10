@@ -101,7 +101,10 @@ def _symlink_target_within_commit(
 
 
 def maybe_tree_entry_within_commit(
-    repo: pygit2.Repository, commit_id: str, path: Path
+    repo: pygit2.Repository,
+    commit_id: str,
+    path: Path,
+    hops_left: int = _MAX_SYMLINK_HOPS,
 ) -> pygit2.Tree | pygit2.Blob | None:
     """Return entry at `path` from the tree of commit `commit_id`.
 
@@ -109,6 +112,14 @@ def maybe_tree_entry_within_commit(
     one does not exist, or is not a tree, RuntimeError is raised.  The
     entry named by the last component need not exist, in which case None
     is returned.
+
+    A symlink named by the last component is followed, giving whatever
+    file it points at within the repo.  Only symlinks to files are
+    followed; one naming a directory, pointing outside the repo, or with
+    a missing target, is an error.
+
+    `hops_left` is how many symlinks may still be followed before the
+    lookup gives up.
     """
     if (commit := repo.get(commit_id)) is None:
         raise KeyError(f"commit {commit_id} not found in repo")
@@ -126,12 +137,22 @@ def maybe_tree_entry_within_commit(
                 f'"{path_part}" not found in "{"/".join(path.parts[:idx])}"'
                 f" within tree of commit {commit_id}"
             )
+
+        if is_last and entry_is_symlink(next_entry):
+            link_blob: pygit2.Blob = next_entry  # type: ignore
+            return _symlink_target_within_commit(
+                repo, commit_id, path, link_blob, hops_left
+            )
+
         entry_type: str = next_entry.type_str  # type: ignore
         if not is_last and entry_type != "tree":
+            # Only symlinks at the end of a path are followed, so one
+            # used as a directory here is reported rather than followed.
+            found = "symlink" if entry_is_symlink(next_entry) else entry_type
             raise RuntimeError(
                 f'expecting "tree" at posn {idx} in path'
                 f' when processing "{path}" within tree of commit {commit_id}'
-                f' but found "{entry_type}"'
+                f' but found "{found}"'
             )
         entry = next_entry  # type: ignore
 
