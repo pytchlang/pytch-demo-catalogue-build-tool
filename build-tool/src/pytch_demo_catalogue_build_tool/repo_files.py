@@ -1,5 +1,6 @@
 import json
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 from typing import Optional
 
 import pygit2
@@ -31,6 +32,31 @@ def entry_is_symlink(entry: pygit2.Object) -> bool:
 # ("a" -> "b" -> "a") raises rather than looping forever.  The value is
 # arbitrary but should be high enough.
 _MAX_SYMLINK_HOPS = 20
+
+
+def _symlink_target_path(link_path: Path, target: str) -> Path:
+    """The repo-relative path which the symlink at `link_path` names.
+
+    As on disk, `target` is relative to the directory holding the
+    link.  Only symlinks pointing within the repo can be followed.  An
+    absolute target, or a relative one climbing above the repo root,
+    is an error.
+    """
+    if PurePosixPath(target).is_absolute():
+        raise RuntimeError(
+            f'symlink "{link_path}" points outside the repo, at "{target}"'
+        )
+
+    resolved = posixpath.normpath(
+        posixpath.join(link_path.parent.as_posix(), target)
+    )
+
+    if resolved == ".." or resolved.startswith("../"):
+        raise RuntimeError(
+            f'symlink "{link_path}" points above the repo root, at "{target}"'
+        )
+
+    return Path(resolved)
 
 
 def maybe_tree_entry_within_commit(
