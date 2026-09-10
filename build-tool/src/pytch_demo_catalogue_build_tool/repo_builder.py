@@ -332,6 +332,10 @@ class DemoSpec:
     chapters: int = 1
     # Whether the demo also carries a (placeholder) video thumbnail.
     has_video: bool = False
+    # Whether the demo carries content assets (images etc. used by its
+    # description).  Only the first locale holds the files themselves;
+    # any other locale shares them via a symlink.
+    has_content_assets: bool = False
     # When set, overrides the project template's projectName (the demo's
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
@@ -507,6 +511,7 @@ def _resolve_demo_spec(
         program_kind=op["programKind"],
         chapters=op.get("chapters", 1),
         has_video=op.get("video", False),
+        has_content_assets=op.get("assets", False),
         display_name=op.get("displayName"),
     )
 
