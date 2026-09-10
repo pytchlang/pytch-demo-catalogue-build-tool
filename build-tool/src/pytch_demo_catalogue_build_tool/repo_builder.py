@@ -190,22 +190,52 @@ class FileState:
             meta = json.loads(project["meta.json"])
             meta["projectName"] = spec.display_name
             project["meta.json"] = _json(meta)
+        # The first locale owns any shared content; the others link to it.
+        owner_locale = spec.locales[0]
         for locale in spec.locales:
             base = f"by-locale/{locale}"
+            owner_base = f"by-locale/{owner_locale}"
+            is_owner = locale == owner_locale
             put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
             # description.md is split into `#`-headed chapters (the front end
             # renders each chapter separately); its first chapter's body is
             # the commit message (see DemoSpec.description), so the built dist
             # still reveals which commit last defined the demo.
             put(f"{base}/content/description.md", spec.render_description())
-            put(f"{base}/content/summary.md", spec.render_summary())
+            put(f"{base}/content/summary.md", spec.render_summary(locale))
             put(f"{base}/content/thumbnail.png", _TINY_PNG)
             # Some demos also carry a video thumbnail; the build tool picks it
             # up by its `thumbnail.<video-ext>` name (see repo_files).
             if spec.has_video:
                 put(f"{base}/content/thumbnail.mp4", _TINY_MP4)
+            if spec.has_content_assets:
+                if is_owner:
+                    put(f"{base}/content/assets/diagram.png", _TINY_PNG)
+                    # An asset which is a link to content outside assets/,
+                    # so following it has to resolve "../summary.md"
+                    # against the directory the link itself lives in.
+                    put_link(
+                        f"{base}/content/assets/caption.md",
+                        f"{base}/content/summary.md",
+                    )
+                else:
+                    # One source of truth for the images etc. used by
+                    # every locale's description: this locale links to
+                    # the owner's copy of each asset.  Its caption is
+                    # thus a link to a link.
+                    for asset in CONTENT_ASSET_NAMES:
+                        put_link(
+                            f"{base}/content/assets/{asset}",
+                            f"{owner_base}/content/assets/{asset}",
+                        )
             for rel, data in project.items():
-                put(f"{base}/project/{rel}", data)
+                # A sharing locale's project keeps its own code and
+                # metadata but shares the (locale-independent) asset
+                # files themselves.
+                if not is_owner and rel.startswith(PROJECT_ASSET_FILES_PREFIX):
+                    put_link(f"{base}/project/{rel}", f"{owner_base}/project/{rel}")
+                else:
+                    put(f"{base}/project/{rel}", data)
 
     def remove_subtree(self, root: str) -> None:
         prefix = f"{root}/"
