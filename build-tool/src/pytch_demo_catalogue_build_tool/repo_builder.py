@@ -103,6 +103,14 @@ class Symlink:
     target: str
 
 
+# Where a demo's project keeps its asset files; a locale sharing another's
+# assets symlinks each file below this prefix rather than copying it.
+PROJECT_ASSET_FILES_PREFIX = "assets/files/"
+
+# What a demo with content assets keeps in each locale's content/assets/ dir.
+CONTENT_ASSET_NAMES = ["diagram.png", "caption.md"]
+
+
 class FileState:
     """A repo tree, modelled as a flat POSIX-path -> bytes mapping.
 
