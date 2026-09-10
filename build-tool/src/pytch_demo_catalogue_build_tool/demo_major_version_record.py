@@ -290,7 +290,8 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         Everything under the tree `repo_path` within the tree of the
         defining commit is written to the directory `dist_path`, which
         is created (along with any missing parents) if it does not
-        already exist.
+        already exist.  A symlink is copied as its target's contents,
+        rather than as the link itself.
         """
         tree: pygit2.Tree = tree_entry_within_commit(  # type: ignore
             self.repo, self.defining_commit_id, repo_path, "tree"
