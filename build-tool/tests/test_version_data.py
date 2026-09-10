@@ -210,6 +210,28 @@ def test_symlinked_content_is_copied_into_dist(history: History, dist: Path) -> 
         assert (assets_dir(locale) / "caption.md").read_text() == summary("en")
 
 
+def test_symlinked_project_asset_is_copied_into_zipfile(
+    history: History, dist: Path
+) -> None:
+    """A locale whose project shares another locale's asset files by symlink
+    still gets those files' real contents in its project zipfile."""
+    uuid = history.uuid("poly")
+
+    def asset_entries(locale: str) -> dict[str, bytes]:
+        with zipfile.ZipFile(dist / uuid / locale / "project.zip") as zf:
+            return {
+                name: zf.read(name)
+                for name in zf.namelist()
+                if name.startswith("assets/files/")
+            }
+
+    en_assets = asset_entries("en")
+    assert en_assets, "the polyglot demo's project has no asset files"
+    assert asset_entries("ga") == en_assets
+    for name, data in en_assets.items():
+        assert data.startswith(b"\x89PNG"), f"{name} is not the real image"
+
+
 def test_served_last_updated_ignores_recommended_flip(
     history: History, built: BuiltRepo, dist: Path
 ) -> None:
