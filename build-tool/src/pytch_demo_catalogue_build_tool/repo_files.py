@@ -27,6 +27,12 @@ def entry_is_symlink(entry: pygit2.Object) -> bool:
     return entry.filemode == pygit2.enums.FileMode.LINK
 
 
+# Bound on the number of symlinks one lookup may follow, so a cycle
+# ("a" -> "b" -> "a") raises rather than looping forever.  The value is
+# arbitrary but should be high enough.
+_MAX_SYMLINK_HOPS = 20
+
+
 def maybe_tree_entry_within_commit(
     repo: pygit2.Repository, commit_id: str, path: Path
 ) -> pygit2.Tree | pygit2.Blob | None:
