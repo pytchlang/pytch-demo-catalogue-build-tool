@@ -13,7 +13,7 @@ class PlaceholderMetadata:
     Global = {
         "authorName": "TODO",
         "programKind": 'TODO: "per-method" or "flat"',
-        "demoKind": 'TODO: "snippet" or "demo"',
+        "demoKind": 'TODO: "snippet" or "game"',
     }
 
     Locale = {
