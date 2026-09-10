@@ -89,6 +89,20 @@ def _json(obj: Any) -> bytes:
     return (json.dumps(obj, indent=2, sort_keys=True) + "\n").encode()
 
 
+@dataclass(frozen=True)
+class Symlink:
+    """A symlink, to be written into the tree in place of a regular file.
+
+    A demo shares content between its locales by symlinking it (see
+    doc/README.md), and the build tool has to follow such a link when
+    writing the dist, so the test repo needs some.  ``target`` is the
+    link text, interpreted as on disk: relative to the directory holding
+    the link.
+    """
+
+    target: str
+
+
 class FileState:
     """A repo tree, modelled as a flat POSIX-path -> bytes mapping.
 
