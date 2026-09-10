@@ -13,6 +13,20 @@ def name_of_tree_entry(entry: pygit2.Object) -> str:
     return entry.name
 
 
+def entry_is_symlink(entry: pygit2.Object) -> bool:
+    """True iff `entry` is a symlink rather than a regular file.
+
+    Git stores a symlink as a blob whose contents are the target path,
+    so only the filemode tells the two apart.  `entry` must therefore
+    have come from a tree.  One fetched straight from the object
+    database has no filemode, and so cannot be classified; an error is
+    raised in that case.
+    """
+    if entry.filemode is None:
+        raise RuntimeError(f"Object {entry.id} has no filemode")
+    return entry.filemode == pygit2.enums.FileMode.LINK
+
+
 def maybe_tree_entry_within_commit(
     repo: pygit2.Repository, commit_id: str, path: Path
 ) -> pygit2.Tree | pygit2.Blob | None:
