@@ -71,7 +71,13 @@ In the rest of this section, we'll refer to that directory as
       progress.**  Directory containing any images, videos, etc.,
       referred to by `description.md`.  If (say) an image is shared
       across multiple languages, symlinks can be used to maintain one
-      source of truth within the repo.
+      source of truth within the repo.  The same goes within the
+      extracted project (for, say, an asset file shared between
+      languages).  The build tool follows such links when producing
+      the `dist/` output, so what is served is always a plain file.
+      Only symlinks to *files* are followed: a symlink naming a
+      directory, one pointing outside the repo, and one whose target
+      is missing are all errors.
 
   * `$DEMO_ROOT/by-locale/en/project/` — Directory containing the
     extracted contents of a Pytch project zipfile.
@@ -117,7 +123,9 @@ The structure, relative to a "demo catalogue base" URL, is as follows.
     * `e9⋯f6/en/content/description.md`
 
     * `e9⋯f6/en/content/assets/` — Directory containing assets needed
-      for the description content, e.g., screenshots, diagrams.
+      for the description content, e.g., screenshots, diagrams.  Any
+      symlinks in the repo have been resolved, so this contains plain
+      files, even where the repo shares one file between languages.
 
     * `e9⋯f6/en/content/thumbnail.png` — _(Only present under the uuid
       for the current version of the demo.)_  Screenshot image.  Can

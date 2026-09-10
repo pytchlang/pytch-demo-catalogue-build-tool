@@ -1,5 +1,6 @@
 import json
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 from typing import Optional
 
 import pygit2
@@ -13,8 +14,97 @@ def name_of_tree_entry(entry: pygit2.Object) -> str:
     return entry.name
 
 
+def entry_is_symlink(entry: pygit2.Object) -> bool:
+    """True iff `entry` is a symlink rather than a regular file.
+
+    Git stores a symlink as a blob whose contents are the target path,
+    so only the filemode tells the two apart.  `entry` must therefore
+    have come from a tree.  One fetched straight from the object
+    database has no filemode, and so cannot be classified; an error is
+    raised in that case.
+    """
+    if entry.filemode is None:
+        raise RuntimeError(f"Object {entry.id} has no filemode")
+    return entry.filemode == pygit2.enums.FileMode.LINK
+
+
+# Bound on the number of symlinks one lookup may follow, so a cycle
+# ("a" -> "b" -> "a") raises rather than looping forever.  The value is
+# arbitrary but should be high enough.
+_MAX_SYMLINK_HOPS = 20
+
+
+def _symlink_target_path(link_path: Path, target: str) -> Path:
+    """The repo-relative path which the symlink at `link_path` names.
+
+    As on disk, `target` is relative to the directory holding the
+    link.  Only symlinks pointing within the repo can be followed.  An
+    absolute target, or a relative one climbing above the repo root,
+    is an error.
+    """
+    if PurePosixPath(target).is_absolute():
+        raise RuntimeError(
+            f'symlink "{link_path}" points outside the repo, at "{target}"'
+        )
+
+    resolved = posixpath.normpath(
+        posixpath.join(link_path.parent.as_posix(), target)
+    )
+
+    if resolved == ".." or resolved.startswith("../"):
+        raise RuntimeError(
+            f'symlink "{link_path}" points above the repo root, at "{target}"'
+        )
+
+    return Path(resolved)
+
+
+def _symlink_target_within_commit(
+    repo: pygit2.Repository,
+    commit_id: str,
+    link_path: Path,
+    link_blob: pygit2.Blob,
+    hops_left: int,
+) -> pygit2.Blob:
+    """The file (blob) to which the symlink at `link_path` points.
+
+    Only symlinks to files are followed (a chain of them, if need be);
+    one naming a directory is an error, as is one whose target is not
+    within the repo, or does not exist.
+    """
+    if hops_left == 0:
+        raise RuntimeError(
+            f'too many symlinks followed from "{link_path}"'
+            f" within tree of commit {commit_id}"
+        )
+
+    target = link_blob.data.decode("utf-8")
+    entry = maybe_tree_entry_within_commit(
+        repo, commit_id, _symlink_target_path(link_path, target), hops_left - 1
+    )
+
+    if entry is None:
+        raise RuntimeError(
+            f'target "{target}" of symlink "{link_path}" not found'
+            f" within tree of commit {commit_id}"
+        )
+
+    entry_type: str = entry.type_str
+    if entry_type != "blob":
+        raise RuntimeError(
+            f'target "{target}" of symlink "{link_path}" is a "{entry_type}"'
+            f" within tree of commit {commit_id};"
+            " only symlinks to files are followed"
+        )
+
+    return entry  # type: ignore
+
+
 def maybe_tree_entry_within_commit(
-    repo: pygit2.Repository, commit_id: str, path: Path
+    repo: pygit2.Repository,
+    commit_id: str,
+    path: Path,
+    hops_left: int = _MAX_SYMLINK_HOPS,
 ) -> pygit2.Tree | pygit2.Blob | None:
     """Return entry at `path` from the tree of commit `commit_id`.
 
@@ -22,6 +112,14 @@ def maybe_tree_entry_within_commit(
     one does not exist, or is not a tree, RuntimeError is raised.  The
     entry named by the last component need not exist, in which case None
     is returned.
+
+    A symlink named by the last component is followed, giving whatever
+    file it points at within the repo.  Only symlinks to files are
+    followed; one naming a directory, pointing outside the repo, or with
+    a missing target, is an error.
+
+    `hops_left` is how many symlinks may still be followed before the
+    lookup gives up.
     """
     if (commit := repo.get(commit_id)) is None:
         raise KeyError(f"commit {commit_id} not found in repo")
@@ -39,12 +137,22 @@ def maybe_tree_entry_within_commit(
                 f'"{path_part}" not found in "{"/".join(path.parts[:idx])}"'
                 f" within tree of commit {commit_id}"
             )
+
+        if is_last and entry_is_symlink(next_entry):
+            link_blob: pygit2.Blob = next_entry  # type: ignore
+            return _symlink_target_within_commit(
+                repo, commit_id, path, link_blob, hops_left
+            )
+
         entry_type: str = next_entry.type_str  # type: ignore
         if not is_last and entry_type != "tree":
+            # Only symlinks at the end of a path are followed, so one
+            # used as a directory here is reported rather than followed.
+            found = "symlink" if entry_is_symlink(next_entry) else entry_type
             raise RuntimeError(
                 f'expecting "tree" at posn {idx} in path'
                 f' when processing "{path}" within tree of commit {commit_id}'
-                f' but found "{entry_type}"'
+                f' but found "{found}"'
             )
         entry = next_entry  # type: ignore
 
@@ -56,8 +164,9 @@ def tree_entry_within_commit(
 ) -> pygit2.Tree | pygit2.Blob:
     """Return entry at `path` from the tree of commit `commit_id`.
 
-    The entry named by the last component of `path` must exist and be of
-    type `exp_type`.  RuntimeError is raised if not.
+    The entry named by the last component of `path` must exist (after
+    following any symlink) and be of type `exp_type`.  RuntimeError is
+    raised if not.
     """
     entry = maybe_tree_entry_within_commit(repo, commit_id, path)
 
