@@ -164,7 +164,8 @@ def test_build_dist_marks_deleted_demo(
     # generated bulk demo, and none of the deleted/superseded versions.
     listed = {e["uuid"] for e in dist_demos_index}
     named_live = {
-        history.uuid(a) for a in ("live", "superB", "mover", "descr", "beacon")
+        history.uuid(a)
+        for a in ("live", "superB", "mover", "descr", "beacon", "poly")
     }
     bulk_uuids = {d["uuid"] for d in bulk_demos(history.bulk)}
     assert listed == named_live | bulk_uuids
