@@ -362,12 +362,14 @@ class DemoSpec:
             )
         return "\n".join(chapters).encode()
 
-    def render_summary(self) -> bytes:
-        """Render this demo's ``summary.md``.
+    def render_summary(self, locale: str) -> bytes:
+        """Render this demo's ``summary.md`` for one locale.
 
-        Include some markup.
+        Include some markup, and name the locale: a demo's content
+        really does differ between its locales, and naming it is what
+        lets a test tell whose copy of a shared file it has been given.
         """
-        return f"A **short** and *snappy* {self.summary}\n".encode()
+        return f"A **short** and *snappy* {self.summary} [{locale}]\n".encode()
 
 
 @dataclass
