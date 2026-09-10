@@ -112,15 +112,18 @@ CONTENT_ASSET_NAMES = ["diagram.png", "caption.md"]
 
 
 class FileState:
-    """A repo tree, modelled as a flat POSIX-path -> bytes mapping.
+    """A repo tree, modelled as a flat POSIX-path -> contents mapping.
 
-    A commit's operations mutate an instance (built from its first
-    parent's state); :meth:`write_tree` then serialises it into a git
-    tree object.
+    A file's contents are its bytes, or a :class:`Symlink` if it is a
+    symlink.  A commit's operations mutate an instance (built from its
+    first parent's state); :meth:`write_tree` then serialises it into a
+    git tree object.
     """
 
-    def __init__(self, files: Optional[dict[str, bytes]] = None) -> None:
-        self._files: dict[str, bytes] = dict(files) if files else {}
+    def __init__(
+        self, files: Optional[dict[str, bytes | Symlink]] = None
+    ) -> None:
+        self._files: dict[str, bytes | Symlink] = dict(files) if files else {}
 
     def copy(self) -> "FileState":
         """An independent copy; git blobs are immutable so are shared."""
