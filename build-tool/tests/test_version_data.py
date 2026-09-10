@@ -173,6 +173,43 @@ def test_build_dist_marks_deleted_demo(
         assert history.uuid(a) not in listed
 
 
+def test_symlinked_content_is_copied_into_dist(history: History, dist: Path) -> None:
+    """A demo sharing content between its locales by symlink gets real files
+    in the dist, not the link targets written out as text.
+
+    The `polyglot` demo's `ga` locale symlinks each of its content assets
+    at `en`'s copy, and `en`'s `caption.md` is itself a symlink to the
+    summary in the content directory above it -- so `ga`'s caption is a
+    link to a link.
+    """
+    uuid = history.uuid("poly")
+
+    def assets_dir(locale: str) -> Path:
+        return dist / uuid / locale / "content" / "assets"
+
+    def summary(locale: str) -> str:
+        meta = json.loads((dist / uuid / locale / "metadata.json").read_text())
+        return meta["summaryMarkdown"]
+
+    # The shared image: the same bytes in both locales, really an image
+    # rather than the text of a link to one, and a copy rather than a
+    # link (the dist is served as plain files, and is not necessarily
+    # even written to a filesystem which has symlinks).
+    png_bytes = (assets_dir("en") / "diagram.png").read_bytes()
+    assert png_bytes.startswith(b"\x89PNG")
+    assert (assets_dir("ga") / "diagram.png").read_bytes() == png_bytes
+    assert not (assets_dir("ga") / "diagram.png").is_symlink()
+
+    # Following the chain from `ga` ends at `en`'s caption, whose own
+    # "../summary.md" resolves against `en`'s content dir, so both
+    # locales get `en`'s summary text here.  Guard first that the two
+    # locales' summaries do differ, since otherwise this would hold
+    # however the links had been resolved.
+    assert summary("ga") != summary("en")
+    for locale in ("en", "ga"):
+        assert (assets_dir(locale) / "caption.md").read_text() == summary("en")
+
+
 def test_served_last_updated_ignores_recommended_flip(
     history: History, built: BuiltRepo, dist: Path
 ) -> None:
