@@ -272,6 +272,12 @@ class FileState:
                     FileState._write_tree_node(repo, value),
                     pygit2.enums.FileMode.TREE,
                 )
+            elif isinstance(value, Symlink):
+                builder.insert(
+                    name,
+                    repo.create_blob(value.target.encode()),
+                    pygit2.enums.FileMode.LINK,
+                )
             else:
                 builder.insert(
                     name, repo.create_blob(value), pygit2.enums.FileMode.BLOB
