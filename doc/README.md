@@ -117,33 +117,39 @@ The structure, relative to a "demo catalogue base" URL, is as follows.
 * `e9fba26e-4a05-4cba-bb7f-e3e12446aaf6/en/` — Directory containing
   content in language `en` for the demo with the given uuid.  There
   will also be similarly-named sibling directories for other demos
-  and/or other languages.  This directory contains the following:
+  and/or other languages.  A directory is written for every major
+  version of every demo in the history, including superseded and
+  deleted ones, so that projects linked to them still have their
+  explanatory content.  Below, a "live" version is one which is listed
+  in the catalogue index.  This directory contains the following:
 
   * `e9⋯f6/en/metadata.json` — Combination of locale-independent and
     locale-specific metadata.  Matches type `DemoCatalogueEntry` in
     front-end webapp.
 
   * `e9⋯f6/en/content/` — Directory containing content (in language
-    `en`) directly copied from repo:
+    `en`) directly copied from repo.  (The repo's `summary.md` is not
+    copied; its content is instead served as `summaryMarkdown` in
+    `metadata.json` and the index.)
 
     * `e9⋯f6/en/content/description.md`
 
-    * `e9⋯f6/en/content/assets/` — Directory containing assets needed
-      for the description content, e.g., screenshots, diagrams.  Any
+    * `e9⋯f6/en/content/assets/` — _(Only present if the repo has
+      such a directory.)_  Directory containing assets needed for the
+      description content, e.g., screenshots, diagrams.  Any
       symlinks in the repo have been resolved, so this contains plain
       files, even where the repo shares one file between languages.
 
-    * `e9⋯f6/en/content/thumbnail.png` — _(Only present under the uuid
-      for the current version of the demo.)_  Screenshot image.  Can
-      also be `.jpg` or other image format.
+    * `e9⋯f6/en/content/thumbnail.png` — _(Only present for a live
+      version.)_  Screenshot image.  Can also be `.jpg` or other image
+      format.
 
     * `e9⋯f6/en/content/thumbnail.mp4` — _(Optional.  Only present
-      (and even then, optionally) under the uuid for the current
-      version of the demo.)_  Screenshot video.  Can also be other
-      video format.
+      (and even then, optionally) for a live version.)_  Screenshot
+      video.  Can also be other video format.
 
-  * `e9⋯f6/en/project.zip` — _(Only present under the uuid for the
-    current version of the demo.)_  Pytch zipfile for the demo.
+  * `e9⋯f6/en/project.zip` — _(Only present for a live version.)_
+    Pytch zipfile for the demo.
 
 ### Structure of `index/en/demos.json` file
 
