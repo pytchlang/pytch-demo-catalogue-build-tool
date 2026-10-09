@@ -19,6 +19,12 @@ image_extensions = _extensions_for_major_type("image")
 video_extensions = _extensions_for_major_type("video")
 
 
+class DemoCatalogueRepoPaths:
+    # Directory, relative to the root of the demo-catalogue repo, under
+    # which all demos live.  Demos anywhere else in the repo are ignored.
+    Demos_Dir = Path("demos")
+
+
 class DemoRepoPaths:
     # File within this repo containing the UUID of a demo.  As well as
     # the contents giving the UUID, the presence of this file marks the
