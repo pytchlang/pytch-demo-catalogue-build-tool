@@ -29,13 +29,14 @@ from typing import Any, Generator, Optional
 import pygit2
 import colorlog
 
-from .constants import DistPaths
+from .constants import DemoCatalogueRepoPaths, DistPaths
 from .demo_catalogue_entry import CatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
 from .validate_catalogue import main as validate_catalogue_main
 
 UUID_FILENAME = "pytch-demo-uuid.txt"
+DEMOS_DIR_PREFIX = f"{DemoCatalogueRepoPaths.Demos_Dir.as_posix()}/"
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +244,28 @@ class Extractor:
     # ---------------------------------------------------------------
     # Locating demos within a commit tree
     # ---------------------------------------------------------------
+
+    def _iter_demos_in_commit(
+        self, commit: pygit2.Commit
+    ) -> Generator[FoundDemo]:
+        """Yield a :class:`FoundDemo` for every demo in ``commit``.
+
+        Only the ``demos/`` directory at the top level of the repo is
+        searched; a uuid file anywhere else is ignored.  A commit with
+        no ``demos/`` directory has no demos.
+        """
+        demos_dir_name = DemoCatalogueRepoPaths.Demos_Dir.as_posix()
+        try:
+            demos_entry = commit.tree / demos_dir_name
+        except KeyError:
+            return
+        if demos_entry.type_str != "tree":
+            raise RuntimeError(
+                f'"{demos_dir_name}" is not a tree within tree of'
+                f" commit {commit.id}"
+            )
+        demos_tree: pygit2.Tree = demos_entry  # type: ignore
+        yield from self._iter_demos(commit, demos_tree, DEMOS_DIR_PREFIX)
 
     def _iter_demos(
         self,
