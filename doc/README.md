@@ -312,8 +312,8 @@ language, in which case a new language is added to the existing demo.
 
 The result will be a collection of files including some marked with
 TODOs.  Once the content of the `description.md` and `summary.md`
-files has been written, and the metadata filled in, the new files can
-all be committed to git.
+files has been written, the metadata filled in, and a thumbnail image
+added (see above), the new files can all be committed to git.
 
 **You must commit the new files to git and then re-run the build tool
 for the new demo to show up in the catalogue in the app.  The build
