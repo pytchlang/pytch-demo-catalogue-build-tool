@@ -339,7 +339,8 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         catalogue_entry_json = json.dumps(asdict(catalogue_entry), indent=2)
         dist_metadata_path.write_text(catalogue_entry_json)
 
-        # Copy "description" and "summary" markdown files.
+        # Copy "description" markdown file.  (The "summary" is served
+        # within the metadata, so is not copied.)
         description_path = dist_content_dir / LocaleContent.Description_File
         description_path.write_bytes(ctx.repo_description_data)
 
