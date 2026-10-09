@@ -268,6 +268,10 @@ distribution file structure under `$DEMO_CATALOGUE_REPO_ROOT/dist/`.
 In principle, a directory other than `$DEMO_CATALOGUE_REPO_ROOT/dist/`
 could be specified, but this is unlikely to be useful.
 
+By default, the history analysed is that of `HEAD`.  The
+`--start-ref` option analyses the history of a different revision
+(branch, tag, or SHA1) instead.
+
 As noted above, verbosity can be increased:
 
 ``` shell
