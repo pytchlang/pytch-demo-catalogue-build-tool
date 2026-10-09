@@ -12,7 +12,6 @@ logger = colorlog.getLogger(__name__)
 class PlaceholderMetadata:
     Global = {
         "authorName": "TODO",
-        "programKind": 'TODO: "per-method" or "flat"',
         "demoKind": 'TODO: "snippet" or "game"',
     }
 
