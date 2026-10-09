@@ -76,11 +76,7 @@ In the rest of this section, we'll refer to that directory as
       across multiple languages, symlinks can be used to maintain one
       source of truth within the repo.  The same goes within the
       extracted project (for, say, an asset file shared between
-      languages).  The build tool follows such links when producing
-      the `dist/` output, so what is served is always a plain file.
-      Only symlinks to *files* are followed: a symlink naming a
-      directory, one pointing outside the repo, and one whose target
-      is missing are all errors.
+      languages).  See "Symlinks" below.
 
   * `$DEMO_ROOT/by-locale/en/project/` — Directory containing the
     extracted contents of a Pytch project zipfile.
@@ -90,6 +86,27 @@ In the rest of this section, we'll refer to that directory as
 
 * `$DEMO_ROOT/by-locale/de/` — Directory containing content for
   language `de`.  Etc.
+
+Each entry within `by-locale/` must be a real directory (not, e.g., a
+symlink to one).
+
+### Symlinks
+
+Any *file* within a demo (an asset, the description, a thumbnail, a
+file within the extracted project) may be a symlink.  The build tool
+follows such links when producing the `dist/` output, so what is
+served is always a plain file.  Only symlinks to *files* are followed:
+a symlink naming a directory, one used as a directory component of a
+path, one pointing outside the repo, and one whose target is missing
+are all errors.
+
+A symlink's target should be within the same demo's root directory
+(e.g., shared between that demo's languages).  The build tool decides
+whether a demo has changed by looking only at the contents of the
+demo's own directory, where a symlink counts as its link text rather
+than its target's contents.  A change to a target *outside* the demo
+is therefore not noticed: the served content and `lastUpdated` are
+not updated until something within the demo itself changes.
 
 
 ## Structure of served content
