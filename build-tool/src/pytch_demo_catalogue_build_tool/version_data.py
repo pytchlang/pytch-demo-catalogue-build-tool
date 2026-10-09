@@ -379,6 +379,8 @@ class Extractor:
                 continue
             if delta.new_file.path != delta.old_file.path:
                 continue
+            if not delta.new_file.path.startswith(DEMOS_DIR_PREFIX):
+                continue
             if _path_basename(delta.new_file.path) != UUID_FILENAME:
                 continue
             old_uuid = self._read_uuid_blob(
