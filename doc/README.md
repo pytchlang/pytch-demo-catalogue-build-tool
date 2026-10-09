@@ -102,8 +102,11 @@ which is therefore git-ignored.
 The structure, relative to a "demo catalogue base" URL, is as follows.
 
 * `index/en/demos.json` — Catalogue of demos available in language
-  `en`, as JSON representing an array.  See below for details of its
-  structure.
+  `en`, as JSON representing an array.  Only live demos (i.e., those
+  present in the analysed commit, normally `HEAD`) are included, most
+  recently updated first (with ties broken by uuid).  An index file is
+  only written for a language having at least one live demo.  See
+  below for details of its structure.
 
 * `index/ga/demos.json` — Catalogue of demos available in language
   `ga`, similarly.
