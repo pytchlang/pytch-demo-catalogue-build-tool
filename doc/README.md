@@ -61,11 +61,14 @@ In the rest of this section, we'll refer to that directory as
 
     * `$DEMO_ROOT/by-locale/en/content/thumbnail.png` — 480×360
       screenshot image.  Can also be `thumbnail.jpg` or any other
-      image format.  Exactly one image file should be present.
+      image format.  Exactly one `thumbnail` image file (i.e., one
+      with stem `thumbnail` and an image extension) must be present.
+      This is required in every version of the demo, not just the
+      latest.
 
     * `$DEMO_ROOT/by-locale/en/content/thumbnail.mp4` — **Optional**
       480×360 video.  Other video formats besides MP4 are OK too.  At
-      most one video file should be present.
+      most one `thumbnail` video file should be present.
 
     * `$DEMO_ROOT/by-locale/en/content/assets/` — **Optional.  Work in
       progress.**  Directory containing any images, videos, etc.,
