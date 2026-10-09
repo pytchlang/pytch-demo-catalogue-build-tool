@@ -203,7 +203,7 @@ class Extractor:
 
     def _scan_commit(self, commit: pygit2.Commit) -> None:
         demos_here: dict[str, DemoSnapshot] = {}
-        for found in self._iter_demos(commit, commit.tree):
+        for found in self._iter_demos_in_commit(commit):
             self.all_uuids.add(found.uuid)
             demos_here[found.uuid] = DemoSnapshot(
                 uuid_file_path=found.uuid_file_path,
