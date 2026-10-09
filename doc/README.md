@@ -188,8 +188,10 @@ types:
 
 * `lastUpdated: string` — ISO8601 (long form, i.e., with “-”s and
   “:”s) to whole-second precision, in UTC, marked with “Z” suffix.
-  (Can vary by locale.)  **Source:** Computed by build tool from git
-  commit history.
+  (Same for all locales of a demo.)  **Source:** Computed by build
+  tool from git commit history: the author time of the most recent
+  commit changing the demo's content, ignoring changes to only the
+  `recommended` flags.
 
 * `recommended: boolean` — Whether this demo should appear in the
   carousel of recommended demos.  **Source:** Property of
