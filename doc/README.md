@@ -18,8 +18,12 @@ process such demos.
 We will refer to the "content" repo's root as
 `$DEMO_CATALOGUE_REPO_ROOT`.
 
-Each demo has its own "root" directory (folder) somewhere under
-`$DEMO_CATALOGUE_REPO_ROOT/demos/`.  For example, we might have a demo
+Each demo has its own "root" directory (folder), which is any
+directory under `$DEMO_CATALOGUE_REPO_ROOT/demos/` containing a
+`pytch-demo-uuid.txt` file.  The build tool only looks within
+`demos/`; a `pytch-demo-uuid.txt` file anywhere else in the repo is
+ignored.  Demos cannot be nested: the build tool does not look inside
+a demo's root for further demos.  For example, we might have a demo
 whose root is:
 
 ``` shell

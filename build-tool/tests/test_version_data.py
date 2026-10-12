@@ -13,6 +13,7 @@ import json
 import zipfile
 from pathlib import Path
 
+import pygit2
 import pytest
 
 from pytch_demo_catalogue_build_tool import version_data
@@ -23,10 +24,13 @@ from pytch_demo_catalogue_build_tool.repo_builder import (
     DATA_DIR,
     DEFAULT_HISTORY,
     BuiltRepo,
+    DemoSpec,
+    FileState,
     History,
     build_repo,
     bulk_demos,
     load_history,
+    _resolve_demo_spec,
 )
 
 HISTORY_PATH = DEFAULT_HISTORY
@@ -385,4 +389,44 @@ def test_dist_conforms_to_openapi_spec(dist: Path) -> None:
     report = validate(SPEC_PATH, dist)
     assert report.errors == [], "catalogue does not conform to the spec:\n" + "\n".join(
         report.errors
+    )
+
+
+def test_only_demos_dir_is_searched(tmp_path: Path) -> None:
+    """Demos are found only under the top-level ``demos/`` directory; a
+    complete demo elsewhere in the repo (even one under a directory
+    named ``demos`` at a deeper level) is ignored, as is a commit
+    having no ``demos/`` directory at all."""
+    inside_uuid = "d0000000-0000-4000-8000-000000000001"
+    outside_uuids = [
+        "d0000000-0000-4000-8000-000000000002",
+        "d0000000-0000-4000-8000-000000000003",
+    ]
+
+    def spec(uuid: str) -> DemoSpec:
+        op = {"demo": "x", "uuid": uuid, "programKind": "flat"}
+        return _resolve_demo_spec(op, HISTORY, "message")
+
+    repo = pygit2.init_repository(str(tmp_path / "repo"))
+    sig = pygit2.Signature("Test Author", "test@example.com", 1_700_000_000, 0)
+
+    no_demos_dir = FileState()
+    no_demos_dir.put_demo("elsewhere/outside", spec(outside_uuids[0]))
+    root_oid = repo.create_commit(
+        "refs/heads/no-demos-dir", sig, sig, "no demos/",
+        no_demos_dir.write_tree(repo), [],
+    )
+    assert Extractor(repo, "no-demos-dir").all_uuids == set()
+
+    with_demos_dir = no_demos_dir.copy()
+    with_demos_dir.put_demo("demos/inside", spec(inside_uuid))
+    with_demos_dir.put_demo("other/demos/nested", spec(outside_uuids[1]))
+    repo.create_commit(
+        "refs/heads/with-demos-dir", sig, sig, "with demos/",
+        with_demos_dir.write_tree(repo), [root_oid],
+    )
+    extractor = Extractor(repo, "with-demos-dir")
+    assert extractor.all_uuids == {inside_uuid}
+    assert extractor.defining_commits[inside_uuid].uuid_file_path == (
+        "demos/inside/pytch-demo-uuid.txt"
     )
