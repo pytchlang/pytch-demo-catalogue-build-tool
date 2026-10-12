@@ -61,11 +61,14 @@ In the rest of this section, we'll refer to that directory as
 
     * `$DEMO_ROOT/by-locale/en/content/thumbnail.png` — 480×360
       screenshot image.  Can also be `thumbnail.jpg` or any other
-      image format.  Exactly one image file should be present.
+      image format.  Exactly one `thumbnail` image file (i.e., one
+      with stem `thumbnail` and an image extension) must be present.
+      This is required in every version of the demo, not just the
+      latest.
 
     * `$DEMO_ROOT/by-locale/en/content/thumbnail.mp4` — **Optional**
       480×360 video.  Other video formats besides MP4 are OK too.  At
-      most one video file should be present.
+      most one `thumbnail` video file should be present.
 
     * `$DEMO_ROOT/by-locale/en/content/assets/` — **Optional.  Work in
       progress.**  Directory containing any images, videos, etc.,
@@ -73,11 +76,7 @@ In the rest of this section, we'll refer to that directory as
       across multiple languages, symlinks can be used to maintain one
       source of truth within the repo.  The same goes within the
       extracted project (for, say, an asset file shared between
-      languages).  The build tool follows such links when producing
-      the `dist/` output, so what is served is always a plain file.
-      Only symlinks to *files* are followed: a symlink naming a
-      directory, one pointing outside the repo, and one whose target
-      is missing are all errors.
+      languages).  See "Symlinks" below.
 
   * `$DEMO_ROOT/by-locale/en/project/` — Directory containing the
     extracted contents of a Pytch project zipfile.
@@ -87,6 +86,27 @@ In the rest of this section, we'll refer to that directory as
 
 * `$DEMO_ROOT/by-locale/de/` — Directory containing content for
   language `de`.  Etc.
+
+Each entry within `by-locale/` must be a real directory (not, e.g., a
+symlink to one).
+
+### Symlinks
+
+Any *file* within a demo (an asset, the description, a thumbnail, a
+file within the extracted project) may be a symlink.  The build tool
+follows such links when producing the `dist/` output, so what is
+served is always a plain file.  Only symlinks to *files* are followed:
+a symlink naming a directory, one used as a directory component of a
+path, one pointing outside the repo, and one whose target is missing
+are all errors.
+
+A symlink's target should be within the same demo's root directory
+(e.g., shared between that demo's languages).  The build tool decides
+whether a demo has changed by looking only at the contents of the
+demo's own directory, where a symlink counts as its link text rather
+than its target's contents.  A change to a target *outside* the demo
+is therefore not noticed: the served content and `lastUpdated` are
+not updated until something within the demo itself changes.
 
 
 ## Structure of served content
@@ -99,8 +119,11 @@ which is therefore git-ignored.
 The structure, relative to a "demo catalogue base" URL, is as follows.
 
 * `index/en/demos.json` — Catalogue of demos available in language
-  `en`, as JSON representing an array.  See below for details of its
-  structure.
+  `en`, as JSON representing an array.  Only live demos (i.e., those
+  present in the analysed commit, normally `HEAD`) are included, most
+  recently updated first (with ties broken by uuid).  An index file is
+  only written for a language having at least one live demo.  See
+  below for details of its structure.
 
 * `index/ga/demos.json` — Catalogue of demos available in language
   `ga`, similarly.
@@ -111,33 +134,39 @@ The structure, relative to a "demo catalogue base" URL, is as follows.
 * `e9fba26e-4a05-4cba-bb7f-e3e12446aaf6/en/` — Directory containing
   content in language `en` for the demo with the given uuid.  There
   will also be similarly-named sibling directories for other demos
-  and/or other languages.  This directory contains the following:
+  and/or other languages.  A directory is written for every major
+  version of every demo in the history, including superseded and
+  deleted ones, so that projects linked to them still have their
+  explanatory content.  Below, a "live" version is one which is listed
+  in the catalogue index.  This directory contains the following:
 
   * `e9⋯f6/en/metadata.json` — Combination of locale-independent and
     locale-specific metadata.  Matches type `DemoCatalogueEntry` in
     front-end webapp.
 
   * `e9⋯f6/en/content/` — Directory containing content (in language
-    `en`) directly copied from repo:
+    `en`) directly copied from repo.  (The repo's `summary.md` is not
+    copied; its content is instead served as `summaryMarkdown` in
+    `metadata.json` and the index.)
 
     * `e9⋯f6/en/content/description.md`
 
-    * `e9⋯f6/en/content/assets/` — Directory containing assets needed
-      for the description content, e.g., screenshots, diagrams.  Any
+    * `e9⋯f6/en/content/assets/` — _(Only present if the repo has
+      such a directory.)_  Directory containing assets needed for the
+      description content, e.g., screenshots, diagrams.  Any
       symlinks in the repo have been resolved, so this contains plain
       files, even where the repo shares one file between languages.
 
-    * `e9⋯f6/en/content/thumbnail.png` — _(Only present under the uuid
-      for the current version of the demo.)_  Screenshot image.  Can
-      also be `.jpg` or other image format.
+    * `e9⋯f6/en/content/thumbnail.png` — _(Only present for a live
+      version.)_  Screenshot image.  Can also be `.jpg` or other image
+      format.
 
     * `e9⋯f6/en/content/thumbnail.mp4` — _(Optional.  Only present
-      (and even then, optionally) under the uuid for the current
-      version of the demo.)_  Screenshot video.  Can also be other
-      video format.
+      (and even then, optionally) for a live version.)_  Screenshot
+      video.  Can also be other video format.
 
-  * `e9⋯f6/en/project.zip` — _(Only present under the uuid for the
-    current version of the demo.)_  Pytch zipfile for the demo.
+  * `e9⋯f6/en/project.zip` — _(Only present for a live version.)_
+    Pytch zipfile for the demo.
 
 ### Structure of `index/en/demos.json` file
 
@@ -176,8 +205,10 @@ types:
 
 * `lastUpdated: string` — ISO8601 (long form, i.e., with “-”s and
   “:”s) to whole-second precision, in UTC, marked with “Z” suffix.
-  (Can vary by locale.)  **Source:** Computed by build tool from git
-  commit history.
+  (Same for all locales of a demo.)  **Source:** Computed by build
+  tool from git commit history: the author time of the most recent
+  commit changing the demo's content, ignoring changes to only the
+  `recommended` flags.
 
 * `recommended: boolean` — Whether this demo should appear in the
   carousel of recommended demos.  **Source:** Property of
@@ -237,6 +268,10 @@ distribution file structure under `$DEMO_CATALOGUE_REPO_ROOT/dist/`.
 In principle, a directory other than `$DEMO_CATALOGUE_REPO_ROOT/dist/`
 could be specified, but this is unlikely to be useful.
 
+By default, the history analysed is that of `HEAD`.  The
+`--start-ref` option analyses the history of a different revision
+(branch, tag, or SHA1) instead.
+
 As noted above, verbosity can be increased:
 
 ``` shell
@@ -277,8 +312,8 @@ language, in which case a new language is added to the existing demo.
 
 The result will be a collection of files including some marked with
 TODOs.  Once the content of the `description.md` and `summary.md`
-files has been written, and the metadata filled in, the new files can
-all be committed to git.
+files has been written, the metadata filled in, and a thumbnail image
+added (see above), the new files can all be committed to git.
 
 **You must commit the new files to git and then re-run the build tool
 for the new demo to show up in the catalogue in the app.  The build
@@ -331,3 +366,32 @@ build-tool/src/pytch_demo_catalogue_build_tool/data/disco-demos-openapi.yaml
 ```
 
 The top-level `develop.sh` script should have set this up.
+
+### Tool to help with regression testing
+
+After making changes to the tools in this repo, you can compare the
+before/after results as follows.  The commands below assume this
+env.var has been set:
+
+* `$BUILD_TOOL_REPO` — path to root of the build-tool
+  repo (i.e., the repo containing the file you are now reading).
+
+Within `$BUILD_TOOL_REPO`, check out the "old" version of the code,
+then within `$DEMO_CATALOGUE_REPO_ROOT`, do
+
+``` shell
+poetry run -P "$BUILD_TOOL_REPO"/build-tool build-dist . /tmp/dist-0
+```
+
+Within `$BUILD_TOOL_REPO`, check out the "new" version of the code,
+then within `$DEMO_CATALOGUE_REPO_ROOT`, do
+
+``` shell
+poetry run -P "$BUILD_TOOL_REPO"/build-tool build-dist . /tmp/dist-1
+```
+
+You can now compare the two sets of built output with
+
+``` shell
+poetry run -P "$BUILD_TOOL_REPO"/build-tool diff-through-zips /tmp/dist-1 /tmp/dist-0
+```
