@@ -366,3 +366,32 @@ build-tool/src/pytch_demo_catalogue_build_tool/data/disco-demos-openapi.yaml
 ```
 
 The top-level `develop.sh` script should have set this up.
+
+### Tool to help with regression testing
+
+After making changes to the tools in this repo, you can compare the
+before/after results as follows.  The commands below assume this
+env.var has been set:
+
+* `$BUILD_TOOL_REPO` — path to root of the build-tool
+  repo (i.e., the repo containing the file you are now reading).
+
+Within `$BUILD_TOOL_REPO`, check out the "old" version of the code,
+then within `$DEMO_CATALOGUE_REPO_ROOT`, do
+
+``` shell
+poetry run -P "$BUILD_TOOL_REPO"/build-tool build-dist . /tmp/dist-0
+```
+
+Within `$BUILD_TOOL_REPO`, check out the "new" version of the code,
+then within `$DEMO_CATALOGUE_REPO_ROOT`, do
+
+``` shell
+poetry run -P "$BUILD_TOOL_REPO"/build-tool build-dist . /tmp/dist-1
+```
+
+You can now compare the two sets of built output with
+
+``` shell
+poetry run -P "$BUILD_TOOL_REPO"/build-tool diff-through-zips /tmp/dist-1 /tmp/dist-0
+```
