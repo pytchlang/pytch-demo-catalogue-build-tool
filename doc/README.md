@@ -397,5 +397,5 @@ poetry run -P "$BUILD_TOOL_REPO"/build-tool build-dist . /tmp/dist-1
 You can now compare the two sets of built output with
 
 ``` shell
-poetry run -P "$BUILD_TOOL_REPO"/build-tool diff-through-zips /tmp/dist-1 /tmp/dist-0
+poetry run -P "$BUILD_TOOL_REPO"/build-tool diff-through-zips /tmp/dist-0 /tmp/dist-1
 ```
