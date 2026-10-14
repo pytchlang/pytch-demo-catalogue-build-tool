@@ -30,7 +30,7 @@ import pygit2
 import colorlog
 
 from .constants import DemoCatalogueRepoPaths, DistPaths
-from .demo_catalogue_entry import CatalogueEntry, IndexRecord
+from .demo_catalogue_entry import CatalogueEntry, InLangCatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
 from .validate_catalogue import main as validate_catalogue_main
@@ -618,6 +618,23 @@ def gather_index_records(
         entries.sort(key=lambda entry: (entry.lastUpdated, entry.uuid), reverse=True)
 
     return entries_by_locale
+
+
+def gather_all_demos_index_entries(
+    entries_by_locale: dict[str, list[CatalogueEntry]],
+) -> list[InLangCatalogueEntry]:
+    entries = [
+        InLangCatalogueEntry(**asdict(entry), language=locale)
+        for locale, locale_entries in entries_by_locale.items()
+        for entry in locale_entries
+    ]
+
+    # Most recently updated first, ties broken by uuid (as for the
+    # by-locale indexes); a demo's entries are then by language.
+    entries.sort(key=lambda entry: entry.language)
+    entries.sort(key=lambda entry: (entry.lastUpdated, entry.uuid), reverse=True)
+
+    return entries
 
 
 # ---------------------------------------------------------------------------
