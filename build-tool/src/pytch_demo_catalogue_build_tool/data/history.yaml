@@ -42,6 +42,7 @@ uuids:
   ambV2:  "99999999-9999-4999-8999-999999999999"
   shrinkA: "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
   shrinkB: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+  lmt:    "ffffffff-ffff-4fff-8fff-ffffffffffff"
 
 # --- The main catalogue history (linear) -------------------------------
 commits:
@@ -277,6 +278,75 @@ commits:
     ops:
       - {kind: put, demo: shrink, uuid: shrinkB, programKind: flat}
 
+# --- Per-locale mtimes ------------------------------------------------
+#
+#   A -> B -> C -> D -> E -> F -> G      (a branch at each of B--G)
+#
+# Each commit changes a different part of demo lmt, whose `ga` locale
+# links to `en`'s content assets.  Every put repeats the earlier
+# commits' changes, so each commit changes only what its message says.
+  - id: lmt-A
+    parents: []
+    message: "A: introduce the demo in one locale"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo"}
+
+  - id: lmt-B
+    branch: locale-mtime-add-ga
+    message: "B: add a locale (touches only the new locale)"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga]}
+
+  - id: lmt-C
+    branch: locale-mtime-edit-ga
+    message: "C: edit content of only the ga locale"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {ga: "The lmt demo, reworded in ga"}}
+
+  - id: lmt-D
+    branch: locale-mtime-edit-asset
+    message: "D: edit an asset of en, linked to by ga"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true}
+
+  - id: lmt-E
+    branch: locale-mtime-edit-en
+    message: "E: edit content of only the en locale"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {en: "The lmt demo, reworded in en",
+                              ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true}
+
+  - id: lmt-F
+    branch: locale-mtime-edit-shared
+    message: "F: edit metadata shared by all locales"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {en: "The lmt demo, reworded in en",
+                              ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true, authorName: "Grace Hopper"}
+
+  - id: lmt-G
+    branch: locale-mtime-flip-recommended
+    message: "G: flip the recommended flag (not an mtime change)"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {en: "The lmt demo, reworded in en",
+                              ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true, authorName: "Grace Hopper",
+         recommended: false}
+
 # --- What each branch's extracted records should look like -------------
 scenarios:
   - start_ref: catalogue
@@ -315,6 +385,36 @@ scenarios:
     expect:
       shrinkA: {latest: shrinkB, present: false, defined_at: shrink-Q}
       shrinkB: {latest: shrinkB, present: true,  defined_at: shrink-S}
+
+  - start_ref: locale-mtime-add-ga
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-B,
+            mtime_at: {en: lmt-A, ga: lmt-B}}
+
+  - start_ref: locale-mtime-edit-ga
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-C,
+            mtime_at: {en: lmt-A, ga: lmt-C}}
+
+  - start_ref: locale-mtime-edit-asset
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-D,
+            mtime_at: {en: lmt-D, ga: lmt-D}}
+
+  - start_ref: locale-mtime-edit-en
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-E,
+            mtime_at: {en: lmt-E, ga: lmt-D}}
+
+  - start_ref: locale-mtime-edit-shared
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-F,
+            mtime_at: {en: lmt-F, ga: lmt-F}}
+
+  - start_ref: locale-mtime-flip-recommended
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-G,
+            mtime_at: {en: lmt-F, ga: lmt-F}}
 
 # --- Bulk live demos for front-end pagination tests --------------------
 #
