@@ -106,6 +106,18 @@ def catalogue_index_template(paths: dict) -> str:
     return candidates[0]
 
 
+def all_demos_index_path(paths: dict) -> str:
+    """The cross-language catalogue index path — the lone path with neither
+    {uuid} nor {language}."""
+    candidates = [t.lstrip("/") for t in paths if not PLACEHOLDER_RE.search(t)]
+    if len(candidates) != 1:
+        raise SystemExit(
+            "expected exactly one cross-language catalogue path (without "
+            f"placeholders) in the spec, found: {candidates!r}"
+        )
+    return candidates[0]
+
+
 def per_demo_templates_by_scope(paths: dict, spec_path: Path) -> dict[str, list[str]]:
     """Map version-scope -> relative path templates, for the fixed per-demo
     files (paths whose only placeholders are {uuid}/{language}).  Scope comes
