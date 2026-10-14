@@ -98,14 +98,26 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
 
         # The "mtime commit" is the most recent change OTHER than just
         # a "recommended" flip, so it can lag behind the "defining
-        # commit" (see `live` and `beacon`).
+        # commit" (see `live` and `beacon`).  It is per locale; a
+        # mapping gives it for each locale, and a single commit is
+        # shorthand for "this commit, for every locale".
         if "mtime_at" in want:
-            want_sha = built.commit_oids[want["mtime_at"]]
-            got_sha = extractor.effective_mtime_commits[uuid]
-            assert got_sha == want_sha, (
-                f"{alias}: mtime_at {got_sha} != {want_sha} "
-                f"({want['mtime_at']})"
-            )
+            want_mtime_at = want["mtime_at"]
+            if isinstance(want_mtime_at, dict):
+                for locale, commit_id in want_mtime_at.items():
+                    want_sha = built.commit_oids[commit_id]
+                    got_sha = extractor.effective_mtime_commits[(uuid, locale)]
+                    assert got_sha == want_sha, (
+                        f"{alias}/{locale}: mtime_at {got_sha} != {want_sha}"
+                        f" ({commit_id})"
+                    )
+            else:
+                want_sha = built.commit_oids[want_mtime_at]
+                got_sha = extractor.effective_mtime_commits[uuid]
+                assert got_sha == want_sha, (
+                    f"{alias}: mtime_at {got_sha} != {want_sha} "
+                    f"({want_mtime_at})"
+                )
 
         if "program_kind" in want:
             assert record.common_program_kind() == want["program_kind"], alias
