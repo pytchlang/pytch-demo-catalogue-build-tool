@@ -570,6 +570,47 @@ class Extractor:
                 maxima.append(c)
         return maxima
 
+    # ---------------------------------------------------------------
+    # Checking that no demo-major-version loses a locale
+    # ---------------------------------------------------------------
+
+    def _check_no_locale_removed(self) -> None:
+        """Raise if any demo-major-version has lost a locale.
+
+        A project linked to a demo in some locale fetches that locale's
+        explanatory content afresh each time it is opened, from the
+        dist files of the demo's uuid.  Those files are written from
+        the uuid's defining commit, so that commit must still have
+        every locale the uuid has ever had.  Removing a locale requires
+        a new uuid (i.e., a new major version), which leaves the old
+        uuid's content, including the removed locale, still served.
+
+        Interpretation note: a locale which was added and then removed
+        before ever being deployed is harmless, but git history cannot
+        tell us that, so such a removal is also an error.
+        """
+        all_locales: dict[str, set[str]] = defaultdict(set)
+        for demos_here in self.commit_demos.values():
+            for uuid, snapshot in demos_here.items():
+                all_locales[uuid] |= snapshot.locales
+
+        problems: list[str] = []
+        for uuid in sorted(self.all_uuids):
+            defining = self.defining_commits[uuid]
+            defining_oid = pygit2.Oid(hex=defining.sha1)
+            defined_locales = self.commit_demos[defining_oid][uuid].locales
+            lost_locales = all_locales[uuid] - defined_locales
+            if lost_locales:
+                problems.append(
+                    f"{uuid} ({defining.uuid_file_path} at {defining.sha1})"
+                    f" has lost locale(s) {sorted(lost_locales)}"
+                )
+
+        if problems:
+            raise RuntimeError(
+                "Locale removed without a new major version"
+                " (see remove-demo-locale): " + "; ".join(problems)
+            )
 
 # ---------------------------------------------------------------------------
 # Stateless helpers
