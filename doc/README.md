@@ -402,6 +402,33 @@ But if a file is later added to `en`, there is no symlink to it in
 `ga`, and if a file is later removed from `en`, its symlink in `ga` is
 left broken.  You must add or remove such symlinks in `ga` by hand.
 
+### Tool to remove a locale
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool remove-demo-locale \
+    "$DEMO_CATALOGUE_REPO_ROOT"/demos/whizzy-games/feed-the-kittens \
+    ga
+```
+
+Removes the locale `ga` of an existing demo, and replaces the demo's
+uuid with a fresh one, making it a new major version.
+
+A demo-major-version must never lose a locale.  A project linked to
+the demo in `ga` fetches the `ga` explanatory content afresh each time
+it is opened, so that content must stay available.  Giving the demo a
+new uuid leaves the old major version, with its `ga` content, still
+served.  **Commit the removal and the new uuid together.**  The
+`build-dist` tool fails if, in the history it analyses, any uuid has
+lost a locale.  Since git history cannot be rewritten once public,
+such a mistake cannot then be fixed simply by bumping the uuid; you
+would need to restore the locale under the old uuid.
+
+The tool refuses to remove a demo's only locale, or a locale which
+another locale's symlinks point into (e.g., `en` after
+`copy-demo-locale` from `en` to `ga`).  In the latter case, replace
+those symlinks with real files first.
+
 ### Tool to build unit-test repo
 
 ``` shell
