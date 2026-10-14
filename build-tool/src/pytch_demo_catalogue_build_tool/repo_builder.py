@@ -196,7 +196,13 @@ class FileState:
             base = f"by-locale/{locale}"
             owner_base = f"by-locale/{owner_locale}"
             is_owner = locale == owner_locale
-            put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
+            if is_owner:
+                put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
+            else:
+                # As made by copy-demo-locale, a sharing locale's
+                # metadata is a link to the owner's, so the build tool
+                # must follow it to read the "recommended" flag.
+                put_link(f"{base}/metadata.json", f"{owner_base}/metadata.json")
             # description.md is split into `#`-headed chapters (the front end
             # renders each chapter separately); its first chapter's body is
             # the commit message (see DemoSpec.description), so the built dist
