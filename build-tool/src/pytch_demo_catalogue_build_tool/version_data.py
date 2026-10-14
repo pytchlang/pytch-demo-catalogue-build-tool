@@ -24,7 +24,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from typing import Any, Generator, Optional
+from typing import Any, Callable, Generator, Optional
 
 import pygit2
 import colorlog
@@ -61,12 +61,6 @@ class DemoSnapshot:
     normalized_hash: str
     full_hash: str
     locales: frozenset[str]
-
-    def effective_hash(self, normalise: bool) -> str:
-        return (
-            self.normalized_hash if normalise
-            else self.full_hash
-        )
 
 
 @dataclass
@@ -123,23 +117,33 @@ class Extractor:
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
 
-        self.defining_commits: dict[str, DefiningCommit] \
-            = self._find_latest_modifications(normalise_locale_metadata=False)
+        defining_mods = self._find_latest_modifications(
+            lambda demos: {uuid: s.full_hash for uuid, s in demos.items()}
+        )
 
-        if self.defining_commits.keys() != self.all_uuids:
+        if defining_mods.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
+
+        self.defining_commits: dict[str, DefiningCommit] = {
+            uuid: DefiningCommit(
+                sha1=str(commit.id),
+                uuid_file_path=self.commit_demos[commit.id][uuid].uuid_file_path,
+            )
+            for uuid, commit in defining_mods.items()
+        }
 
         self._check_no_locale_removed()
 
-        mtime_commits: dict[str, DefiningCommit] \
-            = self._find_latest_modifications(normalise_locale_metadata=True)
+        mtime_mods = self._find_latest_modifications(
+            lambda demos: {uuid: s.normalized_hash for uuid, s in demos.items()}
+        )
 
-        if mtime_commits.keys() != self.all_uuids:
+        if mtime_mods.keys() != self.all_uuids:
             raise AssertionError("not every UUID has an mtime commit")
 
-        self.effective_mtime_commits: dict[str, int] = {
-            uuid: commit.sha1
-            for uuid, commit in mtime_commits.items()
+        self.effective_mtime_commits: dict[str, str] = {
+            uuid: str(commit.id)
+            for uuid, commit in mtime_mods.items()
         }
 
     def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
@@ -462,102 +466,80 @@ class Extractor:
     # Finding the latest modification commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_latest_modifications(
+    def _find_latest_modifications[K](
             self,
-            normalise_locale_metadata: bool,
-    ) -> dict[str, DefiningCommit]:
-        """Find the unique most-recent modification commit for every UUID."""
-        mod_commits: dict[str, list[pygit2.Commit]] = defaultdict(list)
+            hashes_of: Callable[[dict[str, DemoSnapshot]], dict[K, str]],
+    ) -> dict[K, pygit2.Commit]:
+        """Find the unique most-recent modification commit for every key.
+
+        ``hashes_of`` maps one commit's demos (a value of
+        ``commit_demos``) to a hash for each key present in that commit.
+        The caller chooses what a key is and what its hash covers.
+        """
+        key_hashes: dict[pygit2.Oid, dict[K, str]] = {
+            commit.id: hashes_of(self.commit_demos[commit.id])
+            for commit in self.head_ancestry
+        }
+
+        # Every key present in some commit within HEAD's ancestry gets at
+        # least one entry here, because the commit which first introduces
+        # it is necessarily a modification commit.
+        mod_commits: dict[K, list[pygit2.Commit]] = defaultdict(list)
         for commit in self.head_ancestry:
-            demos_here = self.commit_demos[commit.id]
-            for uuid, snapshot in demos_here.items():
-                effective_hash = snapshot.effective_hash(
-                    normalise_locale_metadata
-                )
-                if self._is_modification(
-                        commit,
-                        uuid,
-                        effective_hash,
-                        normalise_locale_metadata,
-                ):
-                    mod_commits[uuid].append(commit)
+            for key, h in key_hashes[commit.id].items():
+                if self._is_modification(commit, key, h, key_hashes):
+                    mod_commits[key].append(commit)
 
-        latest: dict[str, DefiningCommit] = {}
-        for uuid in self.all_uuids:
-            candidates = mod_commits.get(uuid, [])
-            # Every UUID in all_uuids appears in some commit's tree within
-            # HEAD's ancestry (collected by _iter_demos), and the commit
-            # that first introduces it is necessarily a modification
-            # commit, so mod_commits[uuid] is non-empty.
-            if not candidates:
-                raise AssertionError(f"no modification commit found for UUID {uuid}")
-
+        latest: dict[K, pygit2.Commit] = {}
+        for key, candidates in mod_commits.items():
             maxima = self._topological_maxima(candidates)
             if len(maxima) > 1:
                 # Interpretation note: the spec says the *state* must be
-                # well-defined.  If the normalized content of the demo
-                # agrees across all maxima then only the choice of *SHA1*
-                # is ambiguous; I treat that as well-defined and pick
-                # deterministically (latest commit_time, then
-                # lexicographically largest SHA1).  If the content itself
-                # disagrees the state really is ambiguous and we raise,
-                # as the spec instructs.
-                hashes = {
-                    (
-                        self
-                        .commit_demos[m.id][uuid]
-                        .effective_hash(normalise_locale_metadata)
-                    )
-                    for m in maxima
-                }
+                # well-defined.  If the hashed content agrees across all
+                # maxima then only the choice of *SHA1* is ambiguous; I
+                # treat that as well-defined and pick deterministically
+                # (latest commit_time, then lexicographically largest
+                # SHA1).  If the content itself disagrees the state
+                # really is ambiguous and we raise, as the spec
+                # instructs.
+                hashes = {key_hashes[m.id][key] for m in maxima}
                 if len(hashes) > 1:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
                         f"Ambiguous most-recent state for demo-major-version "
-                        f"{uuid}: incomparable modification commits "
+                        f"{key}: incomparable modification commits "
                         f"{sha_list} have differing content.  See "
                         f"old-versions.md for how to disambiguate."
                     )
                 maxima.sort(key=lambda c: (c.commit_time, str(c.id)), reverse=True)
-            chosen = maxima[0]
-            latest[uuid] = DefiningCommit(
-                sha1=str(chosen.id),
-                uuid_file_path=self.commit_demos[chosen.id][uuid].uuid_file_path,
-            )
+            latest[key] = maxima[0]
 
         return latest
 
-    def _is_modification(
+    def _is_modification[K](
             self,
             commit: pygit2.Commit,
-            uuid: str,
+            key: K,
             h: str,
-            normalise_locale_metadata: bool,
+            key_hashes: dict[pygit2.Oid, dict[K, str]],
     ) -> bool:
-        """True if ``commit`` updated the contents of demo ``uuid``.
+        """True if ``commit`` updated the content identified by ``key``.
 
-        A commit is a "modification commit" for a demo if the demo exists
-        in the commit's tree and the demo's (normalized) content differs
-        from every parent's version of that same demo (including parents
-        that don't have the demo at all).  In particular, a merge commit
-        that simply inherits its demo content from one of its parents is
-        NOT a modification commit, which is what lets example 2 in the
-        spec resolve unambiguously.
+        A commit is a "modification commit" for a key if the key's hash
+        in the commit (``h``) differs from every parent's hash for that
+        key (including parents that don't have the key at all).  In
+        particular, a merge commit that simply inherits its content from
+        one of its parents is NOT a modification commit, which is what
+        lets example 2 in the spec resolve unambiguously.
 
-        A root commit (no parents) that contains the demo is trivially a
+        A root commit (no parents) that has the key is trivially a
         modification commit.
         """
         for parent in commit.parents:
             # Invariant: every parent of a HEAD-ancestor is itself a
-            # HEAD-ancestor, so parent.id is always a key of commit_demos.
-            parent_demos = self.commit_demos[parent.id]
-            parent_snapshot = parent_demos.get(uuid)
-            if parent_snapshot is not None:
-                parent_hash = parent_snapshot.effective_hash(
-                    normalise_locale_metadata
-                )
-                if parent_hash == h:
-                    return False
+            # HEAD-ancestor, so parent.id is always a key of key_hashes.
+            if key_hashes[parent.id].get(key) == h:
+                return False
         return True
 
     def _topological_maxima(self, commits: list[pygit2.Commit]):
