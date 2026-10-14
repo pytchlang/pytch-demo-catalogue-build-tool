@@ -129,6 +129,8 @@ class Extractor:
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
 
+        self._check_no_locale_removed()
+
         mtime_commits: dict[str, DefiningCommit] \
             = self._find_defining_commits(normalise_locale_metadata=True)
 
