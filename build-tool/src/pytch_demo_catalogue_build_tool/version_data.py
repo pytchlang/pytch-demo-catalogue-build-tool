@@ -673,6 +673,14 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
             json.dump(locale_index_dicts, f_index, indent=2)
             logger.info(f"wrote index for '{locale}'")
 
+    all_demos_entries = gather_all_demos_index_entries(index_entries_by_locale)
+    index_dir = dist_path / DistPaths.Index_Dir
+    index_dir.mkdir(parents=True, exist_ok=True)
+    with (index_dir / DistPaths.All_Demos_Index_File).open("wt") as f_index:
+        all_demos_dicts = [asdict(entry) for entry in all_demos_entries]
+        json.dump(all_demos_dicts, f_index, indent=2)
+        logger.info("wrote cross-language index")
+
     data_dir = Path(__file__).parent / "data"
     spec_path = data_dir / "disco-demos-openapi.yaml"
     if not spec_path.is_file():
