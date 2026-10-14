@@ -135,6 +135,14 @@ The structure, relative to a "demo catalogue base" URL, is as follows.
 * `index/de/demos.json` — Catalogue of demos available in language
   `de`.  Etc.
 
+* `index/all-demos.json` — Catalogue of all live demos in all
+  languages, as JSON representing an array.  There is one element per
+  (demo, language) pair, so a demo available in (say) both `en` and
+  `ga` has two elements.  Ordered as for the per-language files, with
+  a demo's elements then ordered by language.  This lets the front end
+  show every demo, each in the most suitable language available.  See
+  below for details of its structure.
+
 * `e9fba26e-4a05-4cba-bb7f-e3e12446aaf6/en/` — Directory containing
   content in language `en` for the demo with the given uuid.  There
   will also be similarly-named sibling directories for other demos
@@ -242,6 +250,23 @@ types:
 This type is represented in the Python tool here (see below) as the
 type `CatalogueEntry`.  In the front-end, the zod object is
 `zDemoCatalogueEntry` and the type is `DemoCatalogueEntry`.
+
+### Structure of `index/all-demos.json` file
+
+The JSON should represent an array, each element of which is an object
+with all the properties of an element of `index/en/demos.json` (see
+above), plus:
+
+* `language: string` — The language of this element's
+  locale-specific content (`displayName`, `summaryMarkdown`,
+  `recommended`, and the thumbnail extensions), and so also the
+  language component of the URLs of this demo's resources.  Apart
+  from this property, the element is identical to the corresponding
+  element of `index/{language}/demos.json`.
+
+This type is represented in the Python tool as the type
+`InLangCatalogueEntry`.  In the front-end, the zod object is
+`zDemoInLangCatalogueEntry` and the type is `DemoInLangCatalogueEntry`.
 
 
 ## Tools
