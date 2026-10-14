@@ -39,4 +39,11 @@ class CatalogueEntry:
         )
 
 
+# A catalogue entry together with the language its locale-specific
+# content is in.  Element type of the cross-language index.
+@dataclass
+class InLangCatalogueEntry(CatalogueEntry):
+    language: str
+
+
 type IndexRecord = tuple[str, CatalogueEntry]
