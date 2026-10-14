@@ -361,6 +361,44 @@ poetry run -P build-tool update-demo-project \
 
 Replaces the project content with that from the given zipfile.
 
+### Tool to add a locale sharing another locale's content
+
+``` shell
+cd "$REPO_ROOT"
+poetry run -P build-tool copy-demo-locale \
+    "$DEMO_CATALOGUE_REPO_ROOT"/demos/whizzy-games/feed-the-kittens \
+    en \
+    ga
+```
+
+Creates the new locale `ga` of an existing demo, with the same
+directory structure as locale `en`, but where every file is a relative
+symlink to its counterpart in `en`.  This makes explicit that `ga`
+shares that content with `en`, and that `en` holds the source of
+truth.  The `ga` directory must not already exist.
+
+The tool creates only symlinks.  It is then up to you, the demo
+author, to replace with a real file each symlink whose content should
+differ between the two locales.
+
+For example:
+
+``` shell
+f=by-locale/ga/content/summary.md
+cp --remove-destination "$(readlink -f "$f")" "$f"
+```
+
+You can now edit the now-real file.  Other files, such as
+`project/code/code.json` (if the program shows text) or the thumbnail
+(if it shows text), might need the same treatment.
+
+The tool creates the symlinks once; they do not keep track of later
+changes to *which* files `en` has.  A change to the content of an
+existing `en` file appears in `ga` automatically, via its symlink.
+But if a file is later added to `en`, there is no symlink to it in
+`ga`, and if a file is later removed from `en`, its symlink in `ga` is
+left broken.  You must add or remove such symlinks in `ga` by hand.
+
 ### Tool to build unit-test repo
 
 ``` shell
