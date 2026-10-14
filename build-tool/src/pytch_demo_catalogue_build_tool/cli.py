@@ -7,6 +7,7 @@ import colorlog
 import pytch_demo_catalogue_build_tool.version_data
 import pytch_demo_catalogue_build_tool.new_demo
 import pytch_demo_catalogue_build_tool.update_demo_project
+import pytch_demo_catalogue_build_tool.copy_demo_locale
 import pytch_demo_catalogue_build_tool.validate_catalogue
 
 
@@ -87,6 +88,29 @@ def update_demo(
     configure_logging(log_level)
     pytch_demo_catalogue_build_tool.update_demo_project.main(
         Path(demo_dirname), locale, Path(project_zipfile)
+    )
+
+
+@click.command()
+@click.argument("demo-dirname", type=dir_argument())
+@click.argument("src-locale", type=str)
+@click.argument("dst-locale", type=str)
+@log_level_option()
+def copy_demo_locale(
+    demo_dirname: str,
+    src_locale: str,
+    dst_locale: str,
+    log_level: int,
+):
+    """Create a new locale of a demo as symlinks into an existing one.
+
+    Each file of SRC_LOCALE appears in DST_LOCALE as a relative symlink.
+    Replace with a real file any symlink (e.g., the description and
+    summary) whose content should differ between the two locales.
+    """
+    configure_logging(log_level)
+    pytch_demo_catalogue_build_tool.copy_demo_locale.main(
+        Path(demo_dirname), src_locale, dst_locale
     )
 
 
