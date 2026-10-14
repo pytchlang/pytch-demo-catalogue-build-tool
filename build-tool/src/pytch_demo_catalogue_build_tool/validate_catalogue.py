@@ -328,10 +328,12 @@ def validate(spec_path: Path, root: Path) -> Report:
     by_scope = per_demo_templates_by_scope(paths, spec_path)
     report = Report()
 
-    for language in discover_languages(root, index_template, report):
-        validate_language(
+    catalogues_by_language = {
+        language: validated_language_entries(
             root, language, index_template, by_scope, entry_validator, report
         )
+        for language in discover_languages(root, index_template, report)
+    }
 
     return report
 
