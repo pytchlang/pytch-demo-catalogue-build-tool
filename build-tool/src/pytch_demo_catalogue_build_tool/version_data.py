@@ -60,6 +60,8 @@ class DemoSnapshot:
     uuid_file_path: str
     normalized_hash: str
     full_hash: str
+    # Per locale: its normalized hash (see Extractor._locale_hashes).
+    locale_normalized_hashes: dict[str, str]
     locales: frozenset[str]
 
 
@@ -224,6 +226,7 @@ class Extractor:
                     found,
                     False,
                 ),
+                locale_normalized_hashes=self._locale_hashes(commit, found),
                 locales=_locale_codes(found.demo_tree),
             )
         self.commit_demos[commit.id] = demos_here
@@ -338,6 +341,45 @@ class Extractor:
             normalise_locale_metadata,
         )
         return h.hexdigest()
+
+    def _locale_hashes(
+            self,
+            commit: pygit2.Commit,
+            found: FoundDemo,
+    ) -> dict[str, str]:
+        """SHA-256 for each locale of the demo, ignoring the
+        ``recommended`` flag.
+
+        A locale's hash covers its own directory within ``by-locale``
+        together with everything shared by all locales, i.e.,
+        everything else in the demo.
+        """
+        demo_root = Path(found.uuid_file_path).parent
+        locales_dir_name = DemoRepoPaths.Locales_Dir.as_posix()
+
+        shared = hashlib.sha256()
+        locale_entries: list[tuple[str, pygit2.Object]] = []
+        for entry in sorted(found.demo_tree, key=name_of_tree_entry):
+            name = name_of_tree_entry(entry)
+            if name == locales_dir_name and entry.type_str == "tree":
+                locales_tree: pygit2.Tree = entry  # type: ignore
+                for sub_entry in sorted(locales_tree, key=name_of_tree_entry):
+                    rel = f"{name}/{name_of_tree_entry(sub_entry)}"
+                    if sub_entry.type_str == "tree":
+                        locale_entries.append((rel, sub_entry))
+                    else:
+                        self._hash_entry(
+                            commit, demo_root, sub_entry, rel, shared, True
+                        )
+            else:
+                self._hash_entry(commit, demo_root, entry, name, shared, True)
+
+        hashes: dict[str, str] = {}
+        for rel, entry in locale_entries:
+            h = shared.copy()
+            self._hash_entry(commit, demo_root, entry, rel, h, True)
+            hashes[_path_basename(rel)] = h.hexdigest()
+        return hashes
 
     def _hash_tree(
         self,
