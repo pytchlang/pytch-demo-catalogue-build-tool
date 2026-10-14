@@ -58,7 +58,6 @@ class DemoSnapshot:
     """Per-(commit, uuid) record: where the demo lives and its content hash."""
 
     uuid_file_path: str
-    normalized_hash: str
     full_hash: str
     # Per locale: its normalized hash (see Extractor._locale_hashes).
     locale_normalized_hashes: dict[str, str]
@@ -240,16 +239,7 @@ class Extractor:
             self.all_uuids.add(found.uuid)
             demos_here[found.uuid] = DemoSnapshot(
                 uuid_file_path=found.uuid_file_path,
-                normalized_hash=self._demo_hash(
-                    commit,
-                    found,
-                    True,
-                ),
-                full_hash=self._demo_hash(
-                    commit,
-                    found,
-                    False,
-                ),
+                full_hash=self._demo_hash(commit, found),
                 locale_normalized_hashes=self._locale_hashes(commit, found),
                 locales=_locale_codes(found.demo_tree),
             )
@@ -351,10 +341,8 @@ class Extractor:
             self,
             commit: pygit2.Commit,
             found: FoundDemo,
-            normalise_locale_metadata: bool,
     ) -> str:
-        """SHA-256 over the demo subtree, optionally ignoring the
-        ``recommended`` flag."""
+        """SHA-256 over the whole demo subtree."""
         h = hashlib.sha256()
         self._hash_tree(
             commit,
@@ -362,7 +350,7 @@ class Extractor:
             found.demo_tree,
             h,
             "",
-            normalise_locale_metadata,
+            False,
         )
         return h.hexdigest()
 
