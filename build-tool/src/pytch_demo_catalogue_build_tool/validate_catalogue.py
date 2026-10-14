@@ -2,7 +2,7 @@
 """Validate a discoverable-demos content directory against a spec
 
 Checks that a *built* demo catalogue directory conforms to a given
-OpenAI spec file.  Every language found on disk (a subdirectory of
+OpenAPI spec file.  Every language found on disk (a subdirectory of
 index/) is validated.  For each language:
 
   * index/<lang>/demos.json should be a JSON array; its entries should
