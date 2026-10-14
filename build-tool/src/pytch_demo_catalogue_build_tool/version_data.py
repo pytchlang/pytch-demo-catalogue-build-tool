@@ -208,11 +208,13 @@ class Extractor:
             demos_here[found.uuid] = DemoSnapshot(
                 uuid_file_path=found.uuid_file_path,
                 normalized_hash=self._demo_hash(
-                    found.demo_tree,
+                    commit,
+                    found,
                     True,
                 ),
                 full_hash=self._demo_hash(
-                    found.demo_tree,
+                    commit,
+                    found,
                     False,
                 ),
             )
