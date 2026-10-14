@@ -207,7 +207,7 @@ class FileState:
             # renders each chapter separately); its first chapter's body is
             # the commit message (see DemoSpec.description), so the built dist
             # still reveals which commit last defined the demo.
-            put(f"{base}/content/description.md", spec.render_description())
+            put(f"{base}/content/description.md", spec.render_description(locale))
             put(f"{base}/content/summary.md", spec.render_summary(locale))
             put(f"{base}/content/thumbnail.png", _TINY_PNG)
             # Some demos also carry a video thumbnail; the build tool picks it
@@ -345,8 +345,11 @@ class DemoSpec:
     # When set, overrides the project template's projectName (the demo's
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
+    # Per-locale replacements for `description`, so that one locale's
+    # content can change while another's stays the same.
+    locale_descriptions: dict[str, str] = field(default_factory=dict)
 
-    def render_description(self) -> bytes:
+    def render_description(self, locale: str) -> bytes:
         """Render this demo's ``description.md`` as one or more ``#``-headed
         chapters.
 
@@ -355,7 +358,8 @@ class DemoSpec:
         ``self.chapters`` selects how many (several demos deliberately use
         more than one so multi-chapter rendering is exercised).
 
-        The first chapter's body is ``self.description`` -- i.e. the defining
+        The first chapter's body is ``self.description`` (or the locale's
+        entry in ``self.locale_descriptions``) -- by default the defining
         commit's message -- so the built dist still identifies which commit
         last defined the demo, and two commits that share a ``description``
         (and ``chapters``) still produce byte-identical content.
@@ -363,8 +367,9 @@ class DemoSpec:
         The bodies carry a little inline markdown so a front end has
         non-trivial markup to render and round-trip.
         """
+        description = self.locale_descriptions.get(locale, self.description)
         chapters = [
-            f"# Introduction\n\nThis is the **{self.description}**.\n"
+            f"# Introduction\n\nThis is the **{description}**.\n"
         ]
         for n in range(2, self.chapters + 1):
             chapters.append(
@@ -519,6 +524,7 @@ def _resolve_demo_spec(
         has_video=op.get("video", False),
         has_content_assets=op.get("assets", False),
         display_name=op.get("displayName"),
+        locale_descriptions=op.get("localeDescriptions", {}),
     )
 
 
