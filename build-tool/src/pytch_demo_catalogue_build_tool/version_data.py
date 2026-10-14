@@ -124,7 +124,7 @@ class Extractor:
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
 
         self.defining_commits: dict[str, DefiningCommit] \
-            = self._find_defining_commits(normalise_locale_metadata=False)
+            = self._find_latest_modifications(normalise_locale_metadata=False)
 
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
@@ -132,7 +132,7 @@ class Extractor:
         self._check_no_locale_removed()
 
         mtime_commits: dict[str, DefiningCommit] \
-            = self._find_defining_commits(normalise_locale_metadata=True)
+            = self._find_latest_modifications(normalise_locale_metadata=True)
 
         if mtime_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has an mtime commit")
@@ -459,10 +459,10 @@ class Extractor:
         return heads
 
     # ---------------------------------------------------------------
-    # Finding the defining commit of each demo-major-version
+    # Finding the latest modification commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_defining_commits(
+    def _find_latest_modifications(
             self,
             normalise_locale_metadata: bool,
     ) -> dict[str, DefiningCommit]:
@@ -482,7 +482,7 @@ class Extractor:
                 ):
                     mod_commits[uuid].append(commit)
 
-        defining: dict[str, DefiningCommit] = {}
+        latest: dict[str, DefiningCommit] = {}
         for uuid in self.all_uuids:
             candidates = mod_commits.get(uuid, [])
             # Every UUID in all_uuids appears in some commit's tree within
@@ -520,12 +520,12 @@ class Extractor:
                     )
                 maxima.sort(key=lambda c: (c.commit_time, str(c.id)), reverse=True)
             chosen = maxima[0]
-            defining[uuid] = DefiningCommit(
+            latest[uuid] = DefiningCommit(
                 sha1=str(chosen.id),
                 uuid_file_path=self.commit_demos[chosen.id][uuid].uuid_file_path,
             )
 
-        return defining
+        return latest
 
     def _is_modification(
             self,
