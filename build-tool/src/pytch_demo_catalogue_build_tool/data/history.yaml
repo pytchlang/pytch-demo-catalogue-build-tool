@@ -14,12 +14,12 @@
 # only `recommended` must not alter content).  `programKind` (required, no
 # default) selects which project template in this package's data/ dir the
 # demo is built from.  `chapters` (default 1) sets how many `#`-headed
-# chapters description.md has, `video: true` adds a video thumbnail, and
+# chapters description.md has, `video: true` adds a video thumbnail,
 # `assets: true` adds a content-assets directory (shared between the demo's
-# locales by symlink); all are content, so paired commits that must not
-# count as a change have to agree on them too.  `localeDescriptions` maps
-# a locale to a description used for that locale alone, in place of
-# `description`.
+# locales by symlink), and `assetsEdited: true` changes those assets'
+# contents; all are content, so paired commits that must not count as a
+# change have to agree on them too.  `localeDescriptions` maps a locale to
+# a description used for that locale alone, in place of `description`.
 #
 # `uuids` gives short aliases so the rest of the file stays readable; an
 # alias is resolved to its uuid wherever a uuid is expected (in `ops` and

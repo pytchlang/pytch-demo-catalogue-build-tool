@@ -57,6 +57,14 @@ _TINY_PNG = bytes.fromhex(
     "6082"
 )
 
+# A different (opaque white) 1x1 PNG, for a content asset which has been
+# edited.
+_TINY_PNG_EDITED = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+    "890000000b49444154789c63f80f040009fb03fdfb5e6b2b0000000049454e44"
+    "ae426082"
+)
+
 # A stand-in MP4 for demos that carry a video thumbnail.  The build tool only
 # copies thumbnail bytes verbatim, so any bytes suffice for its own tests; a
 # real (if tiny) clip keeps the output usable as a fixture for a front-end
@@ -216,7 +224,11 @@ class FileState:
                 put(f"{base}/content/thumbnail.mp4", _TINY_MP4)
             if spec.has_content_assets:
                 if is_owner:
-                    put(f"{base}/content/assets/diagram.png", _TINY_PNG)
+                    diagram = (
+                        _TINY_PNG_EDITED if spec.content_assets_edited
+                        else _TINY_PNG
+                    )
+                    put(f"{base}/content/assets/diagram.png", diagram)
                     # An asset which is a link to content outside assets/,
                     # so following it has to resolve "../summary.md"
                     # against the directory the link itself lives in.
@@ -342,6 +354,9 @@ class DemoSpec:
     # description).  Only the first locale holds the files themselves;
     # any other locale shares them via a symlink.
     has_content_assets: bool = False
+    # Whether those content assets are an edited version, which changes
+    # the (shared) content of every locale.
+    content_assets_edited: bool = False
     # When set, overrides the project template's projectName (the demo's
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
@@ -523,6 +538,7 @@ def _resolve_demo_spec(
         chapters=op.get("chapters", 1),
         has_video=op.get("video", False),
         has_content_assets=op.get("assets", False),
+        content_assets_edited=op.get("assetsEdited", False),
         display_name=op.get("displayName"),
         locale_descriptions=op.get("localeDescriptions", {}),
     )
