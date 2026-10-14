@@ -336,7 +336,7 @@ def validate(spec_path: Path, root: Path) -> Report:
     return report
 
 
-def validate_language(
+def validated_language_entries(
     root: Path,
     language: str,
     index_template: str,
@@ -344,6 +344,10 @@ def validate_language(
     entry_validator: Draft202012Validator,
     report: Report,
 ) -> dict[str, dict] | None:
+    """Validate one language's index and per-demo resources, reporting any
+    problems.  Return the index's entries (valid or not) keyed by uuid (those
+    having a string uuid), or None if the index could not be read as an array
+    (which has been reported)."""
     index_rel = index_template.replace("{language}", language)
     all_version_templates = by_scope["all"]
     live_only_templates = by_scope["live"]
