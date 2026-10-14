@@ -114,8 +114,8 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
 @pytest.mark.parametrize(
     "scenario", _scenarios(with_error=True), ids=lambda s: s["start_ref"]
 )
-def test_ambiguous_history_raises(built: BuiltRepo, scenario: dict) -> None:
-    with pytest.raises(RuntimeError, match="[Aa]mbiguous"):
+def test_bad_history_raises(built: BuiltRepo, scenario: dict) -> None:
+    with pytest.raises(RuntimeError, match=scenario["expect_error"]):
         Extractor(built.repo, scenario["start_ref"])
 
 
