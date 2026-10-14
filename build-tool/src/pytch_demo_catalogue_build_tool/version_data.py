@@ -120,7 +120,8 @@ class Extractor:
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
 
         defining_mods = self._find_latest_modifications(
-            lambda demos: {uuid: s.full_hash for uuid, s in demos.items()}
+            lambda demos: {uuid: s.full_hash for uuid, s in demos.items()},
+            lambda uuid: uuid,
         )
 
         if defining_mods.keys() != self.all_uuids:
@@ -136,16 +137,34 @@ class Extractor:
 
         self._check_no_locale_removed()
 
+        # A demo's mtime is per locale, so that (e.g.) a change to only
+        # its `ga` content does not make its `en` version newer.
         mtime_mods = self._find_latest_modifications(
-            lambda demos: {uuid: s.normalized_hash for uuid, s in demos.items()}
+            lambda demos: {
+                (uuid, locale): h
+                for uuid, s in demos.items()
+                for locale, h in s.locale_normalized_hashes.items()
+            },
+            lambda key: f"{key[0]} (locale {key[1]})",
         )
 
-        if mtime_mods.keys() != self.all_uuids:
-            raise AssertionError("not every UUID has an mtime commit")
+        # Since no locale has been removed (checked above), the locales
+        # with an mtime are exactly those in the defining commit.
+        defined_locale_keys = {
+            (uuid, locale)
+            for uuid, defining in self.defining_commits.items()
+            for locale in (
+                self
+                .commit_demos[pygit2.Oid(hex=defining.sha1)][uuid]
+                .locales
+            )
+        }
+        if mtime_mods.keys() != defined_locale_keys:
+            raise AssertionError("not every (UUID, locale) has an mtime commit")
 
-        self.effective_mtime_commits: dict[str, str] = {
-            uuid: str(commit.id)
-            for uuid, commit in mtime_mods.items()
+        self.effective_mtime_commits: dict[tuple[str, str], str] = {
+            key: str(commit.id)
+            for key, commit in mtime_mods.items()
         }
 
     def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
@@ -535,12 +554,14 @@ class Extractor:
     def _find_latest_modifications[K](
             self,
             hashes_of: Callable[[dict[str, DemoSnapshot]], dict[K, str]],
+            describe_key: Callable[[K], str],
     ) -> dict[K, pygit2.Commit]:
         """Find the unique most-recent modification commit for every key.
 
         ``hashes_of`` maps one commit's demos (a value of
         ``commit_demos``) to a hash for each key present in that commit.
         The caller chooses what a key is and what its hash covers.
+        ``describe_key`` gives a key's description for error messages.
         """
         key_hashes: dict[pygit2.Oid, dict[K, str]] = {
             commit.id: hashes_of(self.commit_demos[commit.id])
@@ -573,7 +594,7 @@ class Extractor:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
                         f"Ambiguous most-recent state for demo-major-version "
-                        f"{key}: incomparable modification commits "
+                        f"{describe_key(key)}: incomparable modification commits "
                         f"{sha_list} have differing content.  See "
                         f"old-versions.md for how to disambiguate."
                     )
