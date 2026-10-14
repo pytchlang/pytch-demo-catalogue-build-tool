@@ -31,7 +31,7 @@ import colorlog
 
 from .constants import DemoCatalogueRepoPaths, DistPaths
 from .demo_catalogue_entry import CatalogueEntry, InLangCatalogueEntry, IndexRecord
-from .repo_files import name_of_tree_entry
+from .repo_files import entry_is_symlink, name_of_tree_entry, tree_entry_within_commit
 from .demo_major_version_record import DemoMajorVersionRecord
 from .validate_catalogue import main as validate_catalogue_main
 
@@ -323,6 +323,8 @@ class Extractor:
 
     def _hash_tree(
         self,
+        commit: pygit2.Commit,
+        demo_root: Path,
         tree: pygit2.Tree,
         h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
         prefix: str,
@@ -334,12 +336,21 @@ class Extractor:
             h.update(rel.encode("utf-8"))
             if entry.type_str == "tree":
                 subtree: pygit2.Tree = entry  # type: ignore
-                self._hash_tree(subtree, h, rel, normalise_locale_metadata)
+                self._hash_tree(
+                    commit, demo_root, subtree, h, rel, normalise_locale_metadata
+                )
             elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
                 if entry.type_str != "blob":
                     raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
 
                 blob: pygit2.Blob = entry  # type: ignore
+                if entry_is_symlink(entry):
+                    # A locale sharing another's metadata (as made by
+                    # copy-demo-locale) has a symlink here, whose blob is
+                    # the link text; normalize the file it points at.
+                    blob = tree_entry_within_commit(  # type: ignore
+                        self.repo, str(commit.id), demo_root / rel, "blob"
+                    )
 
                 # The "recommended" flag is ignored data, so we must read
                 # the blob, normalize it, and hash the normalized bytes.
