@@ -324,7 +324,11 @@ def validate(spec_path: Path, root: Path) -> Report:
     spec = load_spec(spec_path)
     paths = spec_paths(spec, spec_path)
     entry_validator = build_entry_validator(spec, spec_path, "DemoCatalogueEntry")
+    in_lang_entry_validator = build_entry_validator(
+        spec, spec_path, "DemoInLangCatalogueEntry"
+    )
     index_template = catalogue_index_template(paths)
+    all_demos_rel = all_demos_index_path(paths)
     by_scope = per_demo_templates_by_scope(paths, spec_path)
     report = Report()
 
@@ -334,6 +338,10 @@ def validate(spec_path: Path, root: Path) -> Report:
         )
         for language in discover_languages(root, index_template, report)
     }
+
+    validate_all_demos(
+        root, all_demos_rel, in_lang_entry_validator, catalogues_by_language, report
+    )
 
     return report
 
