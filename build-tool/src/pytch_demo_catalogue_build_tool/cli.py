@@ -8,6 +8,7 @@ import pytch_demo_catalogue_build_tool.version_data
 import pytch_demo_catalogue_build_tool.new_demo
 import pytch_demo_catalogue_build_tool.update_demo_project
 import pytch_demo_catalogue_build_tool.copy_demo_locale
+import pytch_demo_catalogue_build_tool.remove_demo_locale
 import pytch_demo_catalogue_build_tool.validate_catalogue
 
 
@@ -111,6 +112,27 @@ def copy_demo_locale(
     configure_logging(log_level)
     pytch_demo_catalogue_build_tool.copy_demo_locale.main(
         Path(demo_dirname), src_locale, dst_locale
+    )
+
+
+@click.command()
+@click.argument("demo-dirname", type=dir_argument())
+@click.argument("locale", type=str)
+@log_level_option()
+def remove_demo_locale(
+    demo_dirname: str,
+    locale: str,
+    log_level: int,
+):
+    """Remove a locale of a demo, giving the demo a new uuid.
+
+    Projects linked to the demo in LOCALE still need its content, so
+    the demo becomes a new major version, leaving the old one (with
+    LOCALE) still served.  Commit the removal and the new uuid together.
+    """
+    configure_logging(log_level)
+    pytch_demo_catalogue_build_tool.remove_demo_locale.main(
+        Path(demo_dirname), locale
     )
 
 
