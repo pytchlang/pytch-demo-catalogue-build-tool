@@ -2,7 +2,7 @@
 """Validate a discoverable-demos content directory against a spec
 
 Checks that a *built* demo catalogue directory conforms to a given
-OpenAI spec file.  Every language found on disk (a subdirectory of
+OpenAPI spec file.  Every language found on disk (a subdirectory of
 index/) is validated.  For each language:
 
   * index/<lang>/demos.json should be a JSON array; its entries should
@@ -17,6 +17,12 @@ index/) is validated.  For each language:
     for the language but is NOT in that language's index): only the
     "all"-versions subset of resources is required, its metadata.json
     validates, and its uuid matches the directory name.
+
+The cross-language index (the spec's path with neither {uuid} nor
+{language}, i.e., index/all-demos.json) should be a JSON array whose
+entries validate against the DemoInLangCatalogueEntry schema.  Its
+entries should be exactly those of the per-language indexes, each with
+a `language` property naming which index it is from.
 
 Single sources of truth:
 
@@ -92,20 +98,30 @@ def spec_paths(spec: dict, spec_path: Path) -> dict:
 # --- Expected resources, derived from the spec's paths -----------------
 
 def catalogue_index_template(paths: dict) -> str:
-    """The catalogue index path template — the lone path without {uuid}.  Keeps
-    the {language} placeholder so it can be substituted per discovered language."""
-    candidates = [t.lstrip("/") for t in paths if "{uuid}" not in t]
+    """The per-language catalogue index path template — the lone path without
+    {uuid} but with {language}.  Keeps the {language} placeholder so it can be
+    substituted per discovered language."""
+    candidates = [
+        t.lstrip("/") for t in paths if "{uuid}" not in t and "{language}" in t
+    ]
     if len(candidates) != 1:
         raise SystemExit(
-            "expected exactly one catalogue-level path (without {uuid}) in the "
-            f"spec, found: {candidates!r}"
+            "expected exactly one per-language catalogue path (without {uuid} "
+            f"but with {{language}}) in the spec, found: {candidates!r}"
         )
-    template = candidates[0]
-    if "{language}" not in template:
+    return candidates[0]
+
+
+def all_demos_index_path(paths: dict) -> str:
+    """The cross-language catalogue index path — the lone path with neither
+    {uuid} nor {language}."""
+    candidates = [t.lstrip("/") for t in paths if not PLACEHOLDER_RE.search(t)]
+    if len(candidates) != 1:
         raise SystemExit(
-            f"catalogue index path {template!r} has no {{language}} placeholder"
+            "expected exactly one cross-language catalogue path (without "
+            f"placeholders) in the spec, found: {candidates!r}"
         )
-    return template
+    return candidates[0]
 
 
 def per_demo_templates_by_scope(paths: dict, spec_path: Path) -> dict[str, list[str]]:
@@ -154,12 +170,14 @@ def schema_refs(node: Any, path: str = "#") -> Iterator[str]:
             yield from schema_refs(item, f"{path}/{index}")
 
 
-def build_entry_validator(spec: dict, spec_path: Path) -> Draft202012Validator:
+def build_entry_validator(
+    spec: dict, spec_path: Path, schema_name: str
+) -> Draft202012Validator:
     try:
-        entry_schema = spec["components"]["schemas"]["DemoCatalogueEntry"]
+        entry_schema = spec["components"]["schemas"][schema_name]
     except (KeyError, TypeError) as exc:
         raise SystemExit(
-            f"{spec_path}: could not find components.schemas.DemoCatalogueEntry "
+            f"{spec_path}: could not find components.schemas.{schema_name} "
             f"({exc!r})"
         )
 
@@ -168,7 +186,7 @@ def build_entry_validator(spec: dict, spec_path: Path) -> Draft202012Validator:
     refs = list(schema_refs(entry_schema))
     if refs:
         raise SystemExit(
-            f"{spec_path}: DemoCatalogueEntry now contains $ref(s) at: "
+            f"{spec_path}: {schema_name} now contains $ref(s) at: "
             f"{', '.join(refs)}.\n"
             "This validator assumes the entry schema is self-contained and "
             "validates it without resolving references.  Restore ref-aware "
@@ -311,27 +329,41 @@ def check_fixed_resources(
 def validate(spec_path: Path, root: Path) -> Report:
     spec = load_spec(spec_path)
     paths = spec_paths(spec, spec_path)
-    entry_validator = build_entry_validator(spec, spec_path)
+    entry_validator = build_entry_validator(spec, spec_path, "DemoCatalogueEntry")
+    in_lang_entry_validator = build_entry_validator(
+        spec, spec_path, "DemoInLangCatalogueEntry"
+    )
     index_template = catalogue_index_template(paths)
+    all_demos_rel = all_demos_index_path(paths)
     by_scope = per_demo_templates_by_scope(paths, spec_path)
     report = Report()
 
-    for language in discover_languages(root, index_template, report):
-        validate_language(
+    catalogues_by_language = {
+        language: validated_language_entries(
             root, language, index_template, by_scope, entry_validator, report
         )
+        for language in discover_languages(root, index_template, report)
+    }
+
+    validate_all_demos(
+        root, all_demos_rel, in_lang_entry_validator, catalogues_by_language, report
+    )
 
     return report
 
 
-def validate_language(
+def validated_language_entries(
     root: Path,
     language: str,
     index_template: str,
     by_scope: dict[str, list[str]],
     entry_validator: Draft202012Validator,
     report: Report,
-) -> None:
+) -> dict[str, dict] | None:
+    """Validate one language's index and per-demo resources, reporting any
+    problems.  Return the index's entries (valid or not) keyed by uuid (those
+    having a string uuid), or None if the index could not be read as an array
+    (which has been reported)."""
     index_rel = index_template.replace("{language}", language)
     all_version_templates = by_scope["all"]
     live_only_templates = by_scope["live"]
@@ -340,20 +372,23 @@ def validate_language(
         catalogue = json.loads(content_path(root, index_rel).read_text())
     except (OSError, json.JSONDecodeError) as exc:
         report.fail(f"could not read catalogue {index_rel!r}: {exc}")
-        return
+        return None
 
     if not isinstance(catalogue, list):
         report.fail(f"{index_rel}: expected a JSON array")
-        return
+        return None
 
     # --- Live versions: every uuid listed in this language's index --------
-    live_uuids: set[str] = set()
-    for i, entry in enumerate(catalogue):
-        # Record the uuid (if present) before validation so a malformed live
-        # entry's directory is never misclassified as a superseded version.
-        if isinstance(entry, dict) and isinstance(entry.get("uuid"), str):
-            live_uuids.add(entry["uuid"])
+    # Record every uuid (if present) before validation so a malformed live
+    # entry's directory is never misclassified as a superseded version.
+    entries_by_uuid: dict[str, dict] = {
+        entry["uuid"]: entry
+        for entry in catalogue
+        if isinstance(entry, dict) and isinstance(entry.get("uuid"), str)
+    }
+    live_uuids = set(entries_by_uuid)
 
+    for i, entry in enumerate(catalogue):
         # Only derive resource paths from entries we know are well-formed; a
         # schema-valid entry is guaranteed to have every required field with
         # the right type, so the field accesses below need no guards.
@@ -403,6 +438,71 @@ def validate_language(
             require_latest_is_self=False,
             live_uuids=live_uuids,
         )
+
+    return entries_by_uuid
+
+
+def validate_all_demos(
+    root: Path,
+    index_rel: str,
+    entry_validator: Draft202012Validator,
+    catalogues_by_language: dict[str, dict[str, dict] | None],
+    report: Report,
+) -> None:
+    """Check the cross-language index against the per-language ones.  The
+    per-language indexes and their resources have already been validated, so
+    here it is enough that each entry is schema-valid and, less its `language`,
+    equals the corresponding per-language entry, with none missing.  A language
+    whose index could not be read (None in `catalogues_by_language`) has already
+    been reported, so its entries are not checked against it."""
+    try:
+        catalogue = json.loads(content_path(root, index_rel).read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        report.fail(f"could not read catalogue {index_rel!r}: {exc}")
+        return
+
+    if not isinstance(catalogue, list):
+        report.fail(f"{index_rel}: expected a JSON array")
+        return
+
+    seen: set[tuple[str, str]] = set()
+    for i, entry in enumerate(catalogue):
+        where = f"{index_rel} (entry {i})"
+        if report.schema_errors(where, entry_validator, entry):
+            continue
+        uuid = entry["uuid"]
+        language = entry["language"]
+        key = (uuid, language)
+        if key in seen:
+            report.fail(f"{where}: duplicate entry for {uuid!r} in {language!r}")
+            continue
+        seen.add(key)
+
+        lang_entries = catalogues_by_language.get(language, {})
+        if lang_entries is None:
+            continue
+        lang_entry = lang_entries.get(uuid)
+        if lang_entry is None:
+            report.fail(
+                f"{where}: {uuid!r} is not in the {language!r} catalogue index"
+            )
+            continue
+        entry_less_language = {k: v for k, v in entry.items() if k != "language"}
+        if entry_less_language != lang_entry:
+            report.fail(
+                f"{where}: differs from the entry for {uuid!r} in the "
+                f"{language!r} catalogue index"
+            )
+
+    for language, entries_by_uuid in sorted(catalogues_by_language.items()):
+        if entries_by_uuid is None:
+            continue
+        for uuid in sorted(entries_by_uuid):
+            if (uuid, language) not in seen:
+                report.fail(
+                    f"{index_rel}: no entry for {uuid!r} in {language!r}, "
+                    "although the per-language catalogue index lists it"
+                )
 
 
 def main(spec: Path, content_dir: Path) -> None:

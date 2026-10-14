@@ -30,7 +30,7 @@ import pygit2
 import colorlog
 
 from .constants import DemoCatalogueRepoPaths, DistPaths
-from .demo_catalogue_entry import CatalogueEntry, IndexRecord
+from .demo_catalogue_entry import CatalogueEntry, InLangCatalogueEntry, IndexRecord
 from .repo_files import name_of_tree_entry
 from .demo_major_version_record import DemoMajorVersionRecord
 from .validate_catalogue import main as validate_catalogue_main
@@ -620,6 +620,23 @@ def gather_index_records(
     return entries_by_locale
 
 
+def gather_all_demos_index_entries(
+    entries_by_locale: dict[str, list[CatalogueEntry]],
+) -> list[InLangCatalogueEntry]:
+    entries = [
+        InLangCatalogueEntry(**asdict(entry), language=locale)
+        for locale, locale_entries in entries_by_locale.items()
+        for entry in locale_entries
+    ]
+
+    # Most recently updated first, ties broken by uuid (as for the
+    # by-locale indexes); a demo's entries are then by language.
+    entries.sort(key=lambda entry: entry.language)
+    entries.sort(key=lambda entry: (entry.lastUpdated, entry.uuid), reverse=True)
+
+    return entries
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -655,6 +672,14 @@ def main(repo_path: Path, dist_path: Path, start_ref: Optional[str] = None) -> N
             locale_index_dicts = [asdict(entry) for entry in index_entries]
             json.dump(locale_index_dicts, f_index, indent=2)
             logger.info(f"wrote index for '{locale}'")
+
+    all_demos_entries = gather_all_demos_index_entries(index_entries_by_locale)
+    index_dir = dist_path / DistPaths.Index_Dir
+    index_dir.mkdir(parents=True, exist_ok=True)
+    with (index_dir / DistPaths.All_Demos_Index_File).open("wt") as f_index:
+        all_demos_dicts = [asdict(entry) for entry in all_demos_entries]
+        json.dump(all_demos_dicts, f_index, indent=2)
+        logger.info("wrote cross-language index")
 
     data_dir = Path(__file__).parent / "data"
     spec_path = data_dir / "disco-demos-openapi.yaml"

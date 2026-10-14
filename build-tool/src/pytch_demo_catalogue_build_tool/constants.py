@@ -80,6 +80,10 @@ class DistPaths:
     # File within the by-locale subdirectory of the index directory.
     Index_File = Path("demos.json")
 
+    # File directly within the index directory, listing every live
+    # demo in every language it is available in.
+    All_Demos_Index_File = Path("all-demos.json")
+
     class LocaleContent:
         # Metadata.
         Metadata_File = DemoRepoPaths.LocaleContent.Metadata_File
