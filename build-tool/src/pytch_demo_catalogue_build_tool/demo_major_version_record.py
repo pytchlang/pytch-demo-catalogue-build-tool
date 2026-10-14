@@ -41,8 +41,10 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         return f"superseded by {self.latest_uuid}"
 
     def pprint_str(self) -> str:
+        locales_str = ", ".join(self.locale_codes())
         return (
             f"{self.uuid} {self._demo_root_path} ({self.status_str})"
+            f" [{locales_str}]"
         )
 
     def within_group_sort_key(self) -> str:
