@@ -164,12 +164,14 @@ def schema_refs(node: Any, path: str = "#") -> Iterator[str]:
             yield from schema_refs(item, f"{path}/{index}")
 
 
-def build_entry_validator(spec: dict, spec_path: Path) -> Draft202012Validator:
+def build_entry_validator(
+    spec: dict, spec_path: Path, schema_name: str
+) -> Draft202012Validator:
     try:
-        entry_schema = spec["components"]["schemas"]["DemoCatalogueEntry"]
+        entry_schema = spec["components"]["schemas"][schema_name]
     except (KeyError, TypeError) as exc:
         raise SystemExit(
-            f"{spec_path}: could not find components.schemas.DemoCatalogueEntry "
+            f"{spec_path}: could not find components.schemas.{schema_name} "
             f"({exc!r})"
         )
 
@@ -178,7 +180,7 @@ def build_entry_validator(spec: dict, spec_path: Path) -> Draft202012Validator:
     refs = list(schema_refs(entry_schema))
     if refs:
         raise SystemExit(
-            f"{spec_path}: DemoCatalogueEntry now contains $ref(s) at: "
+            f"{spec_path}: {schema_name} now contains $ref(s) at: "
             f"{', '.join(refs)}.\n"
             "This validator assumes the entry schema is self-contained and "
             "validates it without resolving references.  Restore ref-aware "
@@ -321,7 +323,7 @@ def check_fixed_resources(
 def validate(spec_path: Path, root: Path) -> Report:
     spec = load_spec(spec_path)
     paths = spec_paths(spec, spec_path)
-    entry_validator = build_entry_validator(spec, spec_path)
+    entry_validator = build_entry_validator(spec, spec_path, "DemoCatalogueEntry")
     index_template = catalogue_index_template(paths)
     by_scope = per_demo_templates_by_scope(paths, spec_path)
     report = Report()
