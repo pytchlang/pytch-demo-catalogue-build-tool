@@ -10,6 +10,7 @@ a temporary directory and is discarded when the session ends.
 from __future__ import annotations
 
 import json
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -390,6 +391,63 @@ def test_dist_conforms_to_openapi_spec(dist: Path) -> None:
     assert report.errors == [], "catalogue does not conform to the spec:\n" + "\n".join(
         report.errors
     )
+
+
+def test_all_demos_index_combines_language_indexes(dist: Path) -> None:
+    """The cross-language index holds every per-language entry, marked
+    with its language, most recently updated first."""
+    index_dir = dist / "index"
+    all_demos = json.loads((index_dir / "all-demos.json").read_text())
+
+    expected = [
+        {**entry, "language": lang_dir.name}
+        for lang_dir in index_dir.iterdir()
+        if lang_dir.is_dir()
+        for entry in json.loads((lang_dir / "demos.json").read_text())
+    ]
+
+    def key(e: dict) -> tuple[str, str]:
+        return (e["uuid"], e["language"])
+
+    assert sorted(all_demos, key=key) == sorted(expected, key=key)
+    assert {e["language"] for e in all_demos} == {"en", "ga"}
+
+    recency = [(e["lastUpdated"], e["uuid"]) for e in all_demos]
+    assert recency == sorted(recency, reverse=True)
+
+
+def test_all_demos_index_mismatch_is_reported(dist: Path, tmp_path: Path) -> None:
+    if not SPEC_PATH.exists():
+        pytest.skip(f"OpenAPI spec {SPEC_PATH} is absent")
+
+    bad_dist = tmp_path / "dist"
+    shutil.copytree(dist, bad_dist)
+    all_demos_path = bad_dist / "index" / "all-demos.json"
+    all_demos = json.loads(all_demos_path.read_text())
+    dropped = all_demos.pop()
+    all_demos[0]["displayName"] += " (altered)"
+    all_demos_path.write_text(json.dumps(all_demos))
+
+    report = validate(SPEC_PATH, bad_dist)
+    assert len(report.errors) == 2
+    assert "differs from" in report.errors[0]
+    assert f"no entry for {dropped['uuid']!r}" in report.errors[1]
+
+
+def test_unreadable_language_index_is_reported_once(
+    dist: Path, tmp_path: Path
+) -> None:
+    """A language index which is not a JSON array is reported, without
+    also reporting every cross-language entry in that language."""
+    if not SPEC_PATH.exists():
+        pytest.skip(f"OpenAPI spec {SPEC_PATH} is absent")
+
+    bad_dist = tmp_path / "dist"
+    shutil.copytree(dist, bad_dist)
+    (bad_dist / "index" / "ga" / "demos.json").write_text("{}")
+
+    report = validate(SPEC_PATH, bad_dist)
+    assert report.errors == ["index/ga/demos.json: expected a JSON array"]
 
 
 def test_only_demos_dir_is_searched(tmp_path: Path) -> None:
