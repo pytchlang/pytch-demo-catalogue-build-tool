@@ -350,51 +350,65 @@ class Extractor:
     ):
         for entry in sorted(tree, key=name_of_tree_entry):
             rel = f"{prefix}/{entry.name}" if prefix else name_of_tree_entry(entry)
-            h.update(b"\x00P")
-            h.update(rel.encode("utf-8"))
-            if entry.type_str == "tree":
-                subtree: pygit2.Tree = entry  # type: ignore
-                self._hash_tree(
-                    commit, demo_root, subtree, h, rel, normalise_locale_metadata
+            self._hash_entry(
+                commit, demo_root, entry, rel, h, normalise_locale_metadata
+            )
+
+    def _hash_entry(
+        self,
+        commit: pygit2.Commit,
+        demo_root: Path,
+        entry: pygit2.Object,
+        rel: str,
+        h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
+        normalise_locale_metadata: bool,
+    ):
+        """Add to ``h`` one entry, at path ``rel`` within the demo."""
+        h.update(b"\x00P")
+        h.update(rel.encode("utf-8"))
+        if entry.type_str == "tree":
+            subtree: pygit2.Tree = entry  # type: ignore
+            self._hash_tree(
+                commit, demo_root, subtree, h, rel, normalise_locale_metadata
+            )
+        elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
+            if entry.type_str != "blob":
+                raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
+
+            blob: pygit2.Blob = entry  # type: ignore
+            if entry_is_symlink(entry):
+                # A locale sharing another's metadata (as made by
+                # copy-demo-locale) has a symlink here, whose blob is
+                # the link text; normalize the file it points at.
+                blob = tree_entry_within_commit(  # type: ignore
+                    self.repo, str(commit.id), demo_root / rel, "blob"
                 )
-            elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
-                if entry.type_str != "blob":
-                    raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
 
-                blob: pygit2.Blob = entry  # type: ignore
-                if entry_is_symlink(entry):
-                    # A locale sharing another's metadata (as made by
-                    # copy-demo-locale) has a symlink here, whose blob is
-                    # the link text; normalize the file it points at.
-                    blob = tree_entry_within_commit(  # type: ignore
-                        self.repo, str(commit.id), demo_root / rel, "blob"
-                    )
-
-                # The "recommended" flag is ignored data, so we must read
-                # the blob, normalize it, and hash the normalized bytes.
-                data = _normalize_locale_metadata(rel, blob.data)
-                h.update(b"\x00B")
-                h.update(data)
-            else:
-                # A git blob's id is SHA-1 of ``"blob <len>\x00" + content``
-                # and therefore uniquely fingerprints the content, so we
-                # hash the id directly and spare a blob read from the
-                # object database.  Using a fixed-width id (20 bytes) also
-                # rules out the encoding-ambiguity collisions that the
-                # variable-length ``\x00B<data>`` form is otherwise prone
-                # to.
-                target: pygit2.Object = entry
-                if entry_is_symlink(entry):
-                    # What is served is the file a symlink points at, so
-                    # hash that, not the link text.  Otherwise a change
-                    # to the target (e.g., another locale's copy of a
-                    # shared file, or a file outside the demo) would go
-                    # unnoticed.
-                    target = tree_entry_within_commit(
-                        self.repo, str(commit.id), demo_root / rel, "blob"
-                    )
-                h.update(b"\x00I")
-                h.update(target.id.raw)
+            # The "recommended" flag is ignored data, so we must read
+            # the blob, normalize it, and hash the normalized bytes.
+            data = _normalize_locale_metadata(rel, blob.data)
+            h.update(b"\x00B")
+            h.update(data)
+        else:
+            # A git blob's id is SHA-1 of ``"blob <len>\x00" + content``
+            # and therefore uniquely fingerprints the content, so we
+            # hash the id directly and spare a blob read from the
+            # object database.  Using a fixed-width id (20 bytes) also
+            # rules out the encoding-ambiguity collisions that the
+            # variable-length ``\x00B<data>`` form is otherwise prone
+            # to.
+            target: pygit2.Object = entry
+            if entry_is_symlink(entry):
+                # What is served is the file a symlink points at, so
+                # hash that, not the link text.  Otherwise a change
+                # to the target (e.g., another locale's copy of a
+                # shared file, or a file outside the demo) would go
+                # unnoticed.
+                target = tree_entry_within_commit(
+                    self.repo, str(commit.id), demo_root / rel, "blob"
+                )
+            h.update(b"\x00I")
+            h.update(target.id.raw)
 
     # ---------------------------------------------------------------
     # Detecting UUID replacements (major-version chain links)
