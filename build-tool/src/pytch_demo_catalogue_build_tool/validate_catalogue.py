@@ -92,20 +92,18 @@ def spec_paths(spec: dict, spec_path: Path) -> dict:
 # --- Expected resources, derived from the spec's paths -----------------
 
 def catalogue_index_template(paths: dict) -> str:
-    """The catalogue index path template — the lone path without {uuid}.  Keeps
-    the {language} placeholder so it can be substituted per discovered language."""
-    candidates = [t.lstrip("/") for t in paths if "{uuid}" not in t]
+    """The per-language catalogue index path template — the lone path without
+    {uuid} but with {language}.  Keeps the {language} placeholder so it can be
+    substituted per discovered language."""
+    candidates = [
+        t.lstrip("/") for t in paths if "{uuid}" not in t and "{language}" in t
+    ]
     if len(candidates) != 1:
         raise SystemExit(
-            "expected exactly one catalogue-level path (without {uuid}) in the "
-            f"spec, found: {candidates!r}"
+            "expected exactly one per-language catalogue path (without {uuid} "
+            f"but with {{language}}) in the spec, found: {candidates!r}"
         )
-    template = candidates[0]
-    if "{language}" not in template:
-        raise SystemExit(
-            f"catalogue index path {template!r} has no {{language}} placeholder"
-        )
-    return template
+    return candidates[0]
 
 
 def per_demo_templates_by_scope(paths: dict, spec_path: Path) -> dict[str, list[str]]:
