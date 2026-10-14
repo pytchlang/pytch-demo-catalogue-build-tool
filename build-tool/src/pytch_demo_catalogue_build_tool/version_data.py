@@ -29,7 +29,7 @@ from typing import Any, Generator, Optional
 import pygit2
 import colorlog
 
-from .constants import DemoCatalogueRepoPaths, DistPaths
+from .constants import DemoCatalogueRepoPaths, DemoRepoPaths, DistPaths
 from .demo_catalogue_entry import CatalogueEntry, InLangCatalogueEntry, IndexRecord
 from .repo_files import entry_is_symlink, name_of_tree_entry, tree_entry_within_commit
 from .demo_major_version_record import DemoMajorVersionRecord
@@ -60,6 +60,7 @@ class DemoSnapshot:
     uuid_file_path: str
     normalized_hash: str
     full_hash: str
+    locales: frozenset[str]
 
     def effective_hash(self, normalise: bool) -> str:
         return (
@@ -127,6 +128,8 @@ class Extractor:
 
         if self.defining_commits.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
+
+        self._check_no_locale_removed()
 
         mtime_commits: dict[str, DefiningCommit] \
             = self._find_defining_commits(normalise_locale_metadata=True)
@@ -217,6 +220,7 @@ class Extractor:
                     found,
                     False,
                 ),
+                locales=_locale_codes(found.demo_tree),
             )
         self.commit_demos[commit.id] = demos_here
 
@@ -568,6 +572,47 @@ class Extractor:
                 maxima.append(c)
         return maxima
 
+    # ---------------------------------------------------------------
+    # Checking that no demo-major-version loses a locale
+    # ---------------------------------------------------------------
+
+    def _check_no_locale_removed(self) -> None:
+        """Raise if any demo-major-version has lost a locale.
+
+        A project linked to a demo in some locale fetches that locale's
+        explanatory content afresh each time it is opened, from the
+        dist files of the demo's uuid.  Those files are written from
+        the uuid's defining commit, so that commit must still have
+        every locale the uuid has ever had.  Removing a locale requires
+        a new uuid (i.e., a new major version), which leaves the old
+        uuid's content, including the removed locale, still served.
+
+        Interpretation note: a locale which was added and then removed
+        before ever being deployed is harmless, but git history cannot
+        tell us that, so such a removal is also an error.
+        """
+        all_locales: dict[str, set[str]] = defaultdict(set)
+        for demos_here in self.commit_demos.values():
+            for uuid, snapshot in demos_here.items():
+                all_locales[uuid] |= snapshot.locales
+
+        problems: list[str] = []
+        for uuid in sorted(self.all_uuids):
+            defining = self.defining_commits[uuid]
+            defining_oid = pygit2.Oid(hex=defining.sha1)
+            defined_locales = self.commit_demos[defining_oid][uuid].locales
+            lost_locales = all_locales[uuid] - defined_locales
+            if lost_locales:
+                problems.append(
+                    f"{uuid} ({defining.uuid_file_path} at {defining.sha1})"
+                    f" has lost locale(s) {sorted(lost_locales)}"
+                )
+
+        if problems:
+            raise RuntimeError(
+                "Locale removed without a new major version"
+                " (see remove-demo-locale): " + "; ".join(problems)
+            )
 
 # ---------------------------------------------------------------------------
 # Stateless helpers
@@ -576,6 +621,22 @@ class Extractor:
 
 def _path_basename(p: str) -> str:
     return p.rsplit("/", 1)[-1]
+
+
+def _locale_codes(demo_tree: pygit2.Tree) -> frozenset[str]:
+    """The names of the locale directories within a demo's tree."""
+    try:
+        locales_entry = demo_tree / DemoRepoPaths.Locales_Dir.as_posix()
+    except KeyError:
+        return frozenset()
+    if locales_entry.type_str != "tree":
+        return frozenset()
+    locales_tree: pygit2.Tree = locales_entry  # type: ignore
+    return frozenset(
+        name_of_tree_entry(entry)
+        for entry in locales_tree
+        if entry.type_str == "tree"
+    )
 
 
 def _is_locale_metadata_path(rel_path: str) -> bool:
