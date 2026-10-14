@@ -359,7 +359,10 @@ poetry run -P build-tool update-demo-project \
     feed-kittens.zip
 ```
 
-Replaces the project content with that from the given zipfile.
+Replaces the project content with that from the given zipfile.  Any
+symlinks within the project directory (e.g., as created by
+`copy-demo-locale`; see below) are removed, not followed, so the
+content they pointed at is unaffected.
 
 ### Tool to add a locale sharing another locale's content
 
