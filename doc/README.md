@@ -104,13 +104,12 @@ a symlink naming a directory, one used as a directory component of a
 path, one pointing outside the repo, and one whose target is missing
 are all errors.
 
-A symlink's target should be within the same demo's root directory
-(e.g., shared between that demo's languages).  The build tool decides
-whether a demo has changed by looking only at the contents of the
-demo's own directory, where a symlink counts as its link text rather
-than its target's contents.  A change to a target *outside* the demo
-is therefore not noticed: the served content and `lastUpdated` are
-not updated until something within the demo itself changes.
+A symlink's target should normally be within the same demo's root
+directory (e.g., shared between that demo's languages).  When deciding
+whether a demo has changed, the build tool treats a symlink as the
+file it points at, so a change to a symlink's target counts as a
+change to the demo, even if the target is outside the demo's
+directory.
 
 
 ## Structure of served content
