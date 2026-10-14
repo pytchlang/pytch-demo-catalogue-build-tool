@@ -312,13 +312,21 @@ class Extractor:
 
     def _demo_hash(
             self,
-            demo_tree: pygit2.Tree,
+            commit: pygit2.Commit,
+            found: FoundDemo,
             normalise_locale_metadata: bool,
     ) -> str:
         """SHA-256 over the demo subtree, optionally ignoring the
         ``recommended`` flag."""
         h = hashlib.sha256()
-        self._hash_tree(demo_tree, h, "", normalise_locale_metadata)
+        self._hash_tree(
+            commit,
+            Path(found.uuid_file_path).parent,
+            found.demo_tree,
+            h,
+            "",
+            normalise_locale_metadata,
+        )
         return h.hexdigest()
 
     def _hash_tree(
