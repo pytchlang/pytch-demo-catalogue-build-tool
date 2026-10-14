@@ -428,6 +428,69 @@ def validated_language_entries(
     return entries_by_uuid
 
 
+def validate_all_demos(
+    root: Path,
+    index_rel: str,
+    entry_validator: Draft202012Validator,
+    catalogues_by_language: dict[str, dict[str, dict] | None],
+    report: Report,
+) -> None:
+    """Check the cross-language index against the per-language ones.  The
+    per-language indexes and their resources have already been validated, so
+    here it is enough that each entry is schema-valid and, less its `language`,
+    equals the corresponding per-language entry, with none missing.  A language
+    whose index could not be read (None in `catalogues_by_language`) has already
+    been reported, so its entries are not checked against it."""
+    try:
+        catalogue = json.loads(content_path(root, index_rel).read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        report.fail(f"could not read catalogue {index_rel!r}: {exc}")
+        return
+
+    if not isinstance(catalogue, list):
+        report.fail(f"{index_rel}: expected a JSON array")
+        return
+
+    seen: set[tuple[str, str]] = set()
+    for i, entry in enumerate(catalogue):
+        where = f"{index_rel} (entry {i})"
+        if report.schema_errors(where, entry_validator, entry):
+            continue
+        uuid = entry["uuid"]
+        language = entry["language"]
+        key = (uuid, language)
+        if key in seen:
+            report.fail(f"{where}: duplicate entry for {uuid!r} in {language!r}")
+            continue
+        seen.add(key)
+
+        lang_entries = catalogues_by_language.get(language, {})
+        if lang_entries is None:
+            continue
+        lang_entry = lang_entries.get(uuid)
+        if lang_entry is None:
+            report.fail(
+                f"{where}: {uuid!r} is not in the {language!r} catalogue index"
+            )
+            continue
+        entry_less_language = {k: v for k, v in entry.items() if k != "language"}
+        if entry_less_language != lang_entry:
+            report.fail(
+                f"{where}: differs from the entry for {uuid!r} in the "
+                f"{language!r} catalogue index"
+            )
+
+    for language, entries_by_uuid in sorted(catalogues_by_language.items()):
+        if entries_by_uuid is None:
+            continue
+        for uuid in sorted(entries_by_uuid):
+            if (uuid, language) not in seen:
+                report.fail(
+                    f"{index_rel}: no entry for {uuid!r} in {language!r}, "
+                    "although the per-language catalogue index lists it"
+                )
+
+
 def main(spec: Path, content_dir: Path) -> None:
     """Validate a generated demo content directory against the OpenAPI spec.
 
