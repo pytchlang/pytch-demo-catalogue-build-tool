@@ -343,7 +343,7 @@ def validate_language(
     by_scope: dict[str, list[str]],
     entry_validator: Draft202012Validator,
     report: Report,
-) -> None:
+) -> dict[str, dict] | None:
     index_rel = index_template.replace("{language}", language)
     all_version_templates = by_scope["all"]
     live_only_templates = by_scope["live"]
@@ -352,20 +352,23 @@ def validate_language(
         catalogue = json.loads(content_path(root, index_rel).read_text())
     except (OSError, json.JSONDecodeError) as exc:
         report.fail(f"could not read catalogue {index_rel!r}: {exc}")
-        return
+        return None
 
     if not isinstance(catalogue, list):
         report.fail(f"{index_rel}: expected a JSON array")
-        return
+        return None
 
     # --- Live versions: every uuid listed in this language's index --------
-    live_uuids: set[str] = set()
-    for i, entry in enumerate(catalogue):
-        # Record the uuid (if present) before validation so a malformed live
-        # entry's directory is never misclassified as a superseded version.
-        if isinstance(entry, dict) and isinstance(entry.get("uuid"), str):
-            live_uuids.add(entry["uuid"])
+    # Record every uuid (if present) before validation so a malformed live
+    # entry's directory is never misclassified as a superseded version.
+    entries_by_uuid: dict[str, dict] = {
+        entry["uuid"]: entry
+        for entry in catalogue
+        if isinstance(entry, dict) and isinstance(entry.get("uuid"), str)
+    }
+    live_uuids = set(entries_by_uuid)
 
+    for i, entry in enumerate(catalogue):
         # Only derive resource paths from entries we know are well-formed; a
         # schema-valid entry is guaranteed to have every required field with
         # the right type, so the field accesses below need no guards.
@@ -415,6 +418,8 @@ def validate_language(
             require_latest_is_self=False,
             live_uuids=live_uuids,
         )
+
+    return entries_by_uuid
 
 
 def main(spec: Path, content_dir: Path) -> None:
