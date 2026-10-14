@@ -383,8 +383,18 @@ class Extractor:
                 # rules out the encoding-ambiguity collisions that the
                 # variable-length ``\x00B<data>`` form is otherwise prone
                 # to.
+                target: pygit2.Object = entry
+                if entry_is_symlink(entry):
+                    # What is served is the file a symlink points at, so
+                    # hash that, not the link text.  Otherwise a change
+                    # to the target (e.g., another locale's copy of a
+                    # shared file, or a file outside the demo) would go
+                    # unnoticed.
+                    target = tree_entry_within_commit(
+                        self.repo, str(commit.id), demo_root / rel, "blob"
+                    )
                 h.update(b"\x00I")
-                h.update(entry.id.raw)
+                h.update(target.id.raw)
 
     # ---------------------------------------------------------------
     # Detecting UUID replacements (major-version chain links)
