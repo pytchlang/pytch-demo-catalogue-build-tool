@@ -18,6 +18,12 @@ index/) is validated.  For each language:
     "all"-versions subset of resources is required, its metadata.json
     validates, and its uuid matches the directory name.
 
+The cross-language index (the spec's path with neither {uuid} nor
+{language}, i.e., index/all-demos.json) should be a JSON array whose
+entries validate against the DemoInLangCatalogueEntry schema.  Its
+entries should be exactly those of the per-language indexes, each with
+a `language` property naming which index it is from.
+
 Single sources of truth:
 
   * the list of expected resources is derived from the spec's `paths`;
