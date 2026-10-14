@@ -113,11 +113,18 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
                     )
             else:
                 want_sha = built.commit_oids[want_mtime_at]
-                got_sha = extractor.effective_mtime_commits[uuid]
-                assert got_sha == want_sha, (
-                    f"{alias}: mtime_at {got_sha} != {want_sha} "
-                    f"({want_mtime_at})"
-                )
+                got_shas = {
+                    locale: sha
+                    for (mtime_uuid, locale), sha
+                    in extractor.effective_mtime_commits.items()
+                    if mtime_uuid == uuid
+                }
+                assert got_shas, f"{alias}: no mtime commits"
+                for locale, got_sha in got_shas.items():
+                    assert got_sha == want_sha, (
+                        f"{alias}/{locale}: mtime_at {got_sha} != {want_sha}"
+                        f" ({want_mtime_at})"
+                    )
 
         if "program_kind" in want:
             assert record.common_program_kind() == want["program_kind"], alias
