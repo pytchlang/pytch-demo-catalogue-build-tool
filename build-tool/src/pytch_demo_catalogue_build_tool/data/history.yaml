@@ -19,7 +19,8 @@
 # locales by symlink), and `assetsEdited: true` changes those assets'
 # contents; all are content, so paired commits that must not count as a
 # change have to agree on them too.  `localeDescriptions` maps a locale to
-# a description used for that locale alone, in place of `description`.
+# a description used for that locale alone, in place of `description`, and
+# `localeRecommended` likewise maps a locale to its own `recommended` flag.
 #
 # `uuids` gives short aliases so the rest of the file stays readable; an
 # alias is resolved to its uuid wherever a uuid is expected (in `ops` and

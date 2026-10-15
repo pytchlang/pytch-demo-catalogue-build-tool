@@ -204,8 +204,9 @@ class FileState:
             base = f"by-locale/{locale}"
             owner_base = f"by-locale/{owner_locale}"
             is_owner = locale == owner_locale
-            if is_owner:
-                put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
+            if is_owner or locale in spec.locale_recommended:
+                recommended = spec.recommended_for(locale)
+                put(f"{base}/metadata.json", _json({"recommended": recommended}))
             else:
                 # As made by copy-demo-locale, a sharing locale's
                 # metadata is a link to the owner's, so the build tool
@@ -363,6 +364,13 @@ class DemoSpec:
     # Per-locale replacements for `description`, so that one locale's
     # content can change while another's stays the same.
     locale_descriptions: dict[str, str] = field(default_factory=dict)
+    # Per-locale replacements for `recommended`.  A non-owner locale
+    # listed here gets its own metadata.json rather than a link to the
+    # owner's.
+    locale_recommended: dict[str, bool] = field(default_factory=dict)
+
+    def recommended_for(self, locale: str) -> bool:
+        return self.locale_recommended.get(locale, self.recommended)
 
     def render_description(self, locale: str) -> bytes:
         """Render this demo's ``description.md`` as one or more ``#``-headed
@@ -541,6 +549,7 @@ def _resolve_demo_spec(
         content_assets_edited=op.get("assetsEdited", False),
         display_name=op.get("displayName"),
         locale_descriptions=op.get("localeDescriptions", {}),
+        locale_recommended=op.get("localeRecommended", {}),
     )
 
 
