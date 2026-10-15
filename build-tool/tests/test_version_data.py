@@ -435,6 +435,27 @@ def test_all_demos_index_combines_language_indexes(dist: Path) -> None:
     assert recency == sorted(recency, reverse=True)
 
 
+def test_demo_without_en_locale_is_served_in_its_own_locale(
+    history: History, dist: Path
+) -> None:
+    """A demo with only a `ga` locale is served (content and index entry)
+    in `ga` alone, and appears in the cross-language index once."""
+    uuid = history.uuid("gaonly")
+
+    def index_uuids(language: str) -> set[str]:
+        index_path = dist / "index" / language / "demos.json"
+        return {e["uuid"] for e in json.loads(index_path.read_text())}
+
+    assert uuid in index_uuids("ga")
+    assert uuid not in index_uuids("en")
+    assert (dist / uuid / "ga" / "metadata.json").is_file()
+    assert not (dist / uuid / "en").exists()
+
+    all_demos = json.loads((dist / "index" / "all-demos.json").read_text())
+    languages = [e["language"] for e in all_demos if e["uuid"] == uuid]
+    assert languages == ["ga"]
+
+
 def test_all_demos_index_mismatch_is_reported(dist: Path, tmp_path: Path) -> None:
     if not SPEC_PATH.exists():
         pytest.skip(f"OpenAPI spec {SPEC_PATH} is absent")

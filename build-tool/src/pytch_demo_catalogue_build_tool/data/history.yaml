@@ -44,6 +44,7 @@ uuids:
   shrinkA: "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
   shrinkB: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
   lmt:    "ffffffff-ffff-4fff-8fff-ffffffffffff"
+  gaonly: "12121212-1212-4212-8212-121212121212"
 
 # --- The main catalogue history (linear) -------------------------------
 commits:
@@ -186,6 +187,16 @@ commits:
       # this becomes the demo's defining commit.  The reworded description is
       # multi-chapter (and add-story's was single), itself a content change.
       - {kind: put, demo: story, uuid: descr, programKind: flat, chapters: 2}
+
+  - id: add-ga-only
+    branch: catalogue
+    message: "Add a demo available only in ga"
+    ops:
+      # No `en` locale at all, so a front end showing every demo has to
+      # fall back to another language for it.
+      - {kind: put, demo: seanchai, uuid: gaonly, programKind: flat,
+         locales: [ga], displayName: "Gaeilge-only demo",
+         recommended: false}
 
 # --- A non-linear history that is ambiguous (old-versions.md example) ---
 #
@@ -375,6 +386,8 @@ scenarios:
                mtime_at: edit-beacon, program_kind: flat}
       poly:   {latest: poly,   present: true,  defined_at: add-polyglot,
                mtime_at: add-polyglot, program_kind: per-method}
+      gaonly: {latest: gaonly, present: true,  defined_at: add-ga-only,
+               mtime_at: {ga: add-ga-only}}
 
   - start_ref: ambiguous
     expect_error: "[Aa]mbiguous"
@@ -426,7 +439,7 @@ scenarios:
 # catalogue index.  Their uuids are derived deterministically from the demo
 # name, so the built dist is stable across runs.
 bulk:
-  after: reword-story
+  after: add-ga-only
   branch: catalogue
   count: 25
   programKinds: [flat, per-method]
