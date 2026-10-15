@@ -189,7 +189,9 @@ def test_build_dist_marks_deleted_demo(
     listed = {e["uuid"] for e in dist_demos_index}
     named_live = {
         history.uuid(a)
-        for a in ("live", "superB", "mover", "descr", "beacon", "poly")
+        for a in (
+            "live", "superB", "mover", "descr", "beacon", "poly", "bilingual"
+        )
     }
     bulk_uuids = {d["uuid"] for d in bulk_demos(history.bulk)}
     assert listed == named_live | bulk_uuids
@@ -429,7 +431,7 @@ def test_all_demos_index_combines_language_indexes(dist: Path) -> None:
         return (e["uuid"], e["language"])
 
     assert sorted(all_demos, key=key) == sorted(expected, key=key)
-    assert {e["language"] for e in all_demos} == {"en", "ga"}
+    assert {e["language"] for e in all_demos} == {"en", "ga", "de"}
 
     recency = [(e["lastUpdated"], e["uuid"]) for e in all_demos]
     assert recency == sorted(recency, reverse=True)
@@ -454,6 +456,19 @@ def test_demo_without_en_locale_is_served_in_its_own_locale(
     all_demos = json.loads((dist / "index" / "all-demos.json").read_text())
     languages = [e["language"] for e in all_demos if e["uuid"] == uuid]
     assert languages == ["ga"]
+
+
+def test_recommended_flag_can_differ_between_locales(
+    history: History, dist: Path
+) -> None:
+    """A demo whose `de` locale has its own "recommended" flag is served
+    with a different flag in each language."""
+    uuid = history.uuid("bilingual")
+    all_demos = json.loads((dist / "index" / "all-demos.json").read_text())
+    recommended = {
+        e["language"]: e["recommended"] for e in all_demos if e["uuid"] == uuid
+    }
+    assert recommended == {"en": True, "de": False}
 
 
 def test_all_demos_index_mismatch_is_reported(dist: Path, tmp_path: Path) -> None:

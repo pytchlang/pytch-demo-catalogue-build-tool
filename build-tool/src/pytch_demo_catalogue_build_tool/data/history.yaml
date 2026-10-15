@@ -45,6 +45,7 @@ uuids:
   shrinkB: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
   lmt:    "ffffffff-ffff-4fff-8fff-ffffffffffff"
   gaonly: "12121212-1212-4212-8212-121212121212"
+  bilingual: "34343434-3434-4434-8434-343434343434"
 
 # --- The main catalogue history (linear) -------------------------------
 commits:
@@ -197,6 +198,16 @@ commits:
       - {kind: put, demo: seanchai, uuid: gaonly, programKind: flat,
          locales: [ga], displayName: "Gaeilge-only demo",
          recommended: false}
+
+  - id: add-bilingual
+    branch: catalogue
+    message: "Add a demo in en and de, recommended only in en"
+    ops:
+      # `de` has its own "recommended" flag, so which demos a front end
+      # recommends depends on the language it shows each demo in.
+      - {kind: put, demo: bilingual, uuid: bilingual, programKind: per-method,
+         locales: [en, de], displayName: "English-and-German demo",
+         localeRecommended: {de: false}}
 
 # --- A non-linear history that is ambiguous (old-versions.md example) ---
 #
@@ -388,6 +399,8 @@ scenarios:
                mtime_at: add-polyglot, program_kind: per-method}
       gaonly: {latest: gaonly, present: true,  defined_at: add-ga-only,
                mtime_at: {ga: add-ga-only}}
+      bilingual: {latest: bilingual, present: true,
+                  defined_at: add-bilingual, mtime_at: add-bilingual}
 
   - start_ref: ambiguous
     expect_error: "[Aa]mbiguous"
@@ -439,7 +452,7 @@ scenarios:
 # catalogue index.  Their uuids are derived deterministically from the demo
 # name, so the built dist is stable across runs.
 bulk:
-  after: add-ga-only
+  after: add-bilingual
   branch: catalogue
   count: 25
   programKinds: [flat, per-method]
