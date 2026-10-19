@@ -104,13 +104,12 @@ a symlink naming a directory, one used as a directory component of a
 path, one pointing outside the repo, and one whose target is missing
 are all errors.
 
-A symlink's target should be within the same demo's root directory
-(e.g., shared between that demo's languages).  The build tool decides
-whether a demo has changed by looking only at the contents of the
-demo's own directory, where a symlink counts as its link text rather
-than its target's contents.  A change to a target *outside* the demo
-is therefore not noticed: the served content and `lastUpdated` are
-not updated until something within the demo itself changes.
+A symlink's target should normally be within the same demo's root
+directory (e.g., shared between that demo's languages).  When deciding
+whether a demo has changed, the build tool treats a symlink as the
+file it points at, so a change to a symlink's target counts as a
+change to the demo, even if the target is outside the demo's
+directory.
 
 
 ## Structure of served content
@@ -217,10 +216,15 @@ types:
 
 * `lastUpdated: string` — ISO8601 (long form, i.e., with “-”s and
   “:”s) to whole-second precision, in UTC, marked with “Z” suffix.
-  (Same for all locales of a demo.)  **Source:** Computed by build
-  tool from git commit history: the author time of the most recent
-  commit changing the demo's content, ignoring changes to only the
-  `recommended` flags.
+  (Can differ between locales of a demo.)  **Source:** Computed by
+  build tool from git commit history: the author time of the most
+  recent commit changing this locale's content, ignoring changes to
+  only the `recommended` flags.  A locale's content is its own
+  `by-locale/{lang}` directory together with everything outside
+  `by-locale` (which all locales share), with any symlink counting as
+  the file it points at.  So, for example, editing only the `ga` text
+  does not change the `en` entry's `lastUpdated`, but editing a file
+  in `en` which `ga` links to changes both.
 
 * `recommended: boolean` — Whether this demo should appear in the
   carousel of recommended demos.  **Source:** Property of

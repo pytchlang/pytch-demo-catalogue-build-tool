@@ -24,7 +24,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from typing import Any, Generator, Optional
+from typing import Any, Callable, Generator, Optional
 
 import pygit2
 import colorlog
@@ -58,15 +58,10 @@ class DemoSnapshot:
     """Per-(commit, uuid) record: where the demo lives and its content hash."""
 
     uuid_file_path: str
-    normalized_hash: str
     full_hash: str
+    # Per locale: its normalized hash (see Extractor._locale_hashes).
+    locale_normalized_hashes: dict[str, str]
     locales: frozenset[str]
-
-    def effective_hash(self, normalise: bool) -> str:
-        return (
-            self.normalized_hash if normalise
-            else self.full_hash
-        )
 
 
 @dataclass
@@ -123,23 +118,52 @@ class Extractor:
 
         self.chain_heads: dict[str, str] = self._resolve_chain_heads()
 
-        self.defining_commits: dict[str, DefiningCommit] \
-            = self._find_defining_commits(normalise_locale_metadata=False)
+        defining_mods = self._find_latest_modifications(
+            lambda demos: {uuid: s.full_hash for uuid, s in demos.items()},
+            lambda uuid: uuid,
+        )
 
-        if self.defining_commits.keys() != self.all_uuids:
+        if defining_mods.keys() != self.all_uuids:
             raise AssertionError("not every UUID has a defining commit")
+
+        self.defining_commits: dict[str, DefiningCommit] = {
+            uuid: DefiningCommit(
+                sha1=str(commit.id),
+                uuid_file_path=self.commit_demos[commit.id][uuid].uuid_file_path,
+            )
+            for uuid, commit in defining_mods.items()
+        }
 
         self._check_no_locale_removed()
 
-        mtime_commits: dict[str, DefiningCommit] \
-            = self._find_defining_commits(normalise_locale_metadata=True)
+        # A demo's mtime is per locale, so that (e.g.) a change to only
+        # its `ga` content does not make its `en` version newer.
+        mtime_mods = self._find_latest_modifications(
+            lambda demos: {
+                (uuid, locale): h
+                for uuid, s in demos.items()
+                for locale, h in s.locale_normalized_hashes.items()
+            },
+            lambda key: f"{key[0]} (locale {key[1]})",
+        )
 
-        if mtime_commits.keys() != self.all_uuids:
-            raise AssertionError("not every UUID has an mtime commit")
+        # Since no locale has been removed (checked above), the locales
+        # with an mtime are exactly those in the defining commit.
+        defined_locale_keys = {
+            (uuid, locale)
+            for uuid, defining in self.defining_commits.items()
+            for locale in (
+                self
+                .commit_demos[pygit2.Oid(hex=defining.sha1)][uuid]
+                .locales
+            )
+        }
+        if mtime_mods.keys() != defined_locale_keys:
+            raise AssertionError("not every (UUID, locale) has an mtime commit")
 
-        self.effective_mtime_commits: dict[str, int] = {
-            uuid: commit.sha1
-            for uuid, commit in mtime_commits.items()
+        self.effective_mtime_commits: dict[tuple[str, str], str] = {
+            key: str(commit.id)
+            for key, commit in mtime_mods.items()
         }
 
     def _resolve_tip(self, start_ref: Optional[str]) -> pygit2.Commit:
@@ -182,7 +206,12 @@ class Extractor:
                 self._latest_uuid(uuid),
                 (demo_commit := self.defining_commits[uuid]).sha1,
                 Path(demo_commit.uuid_file_path).parent,
-                self.effective_mtime_commits[uuid],
+                {
+                    locale: sha1
+                    for (mtime_uuid, locale), sha1
+                    in self.effective_mtime_commits.items()
+                    if mtime_uuid == uuid
+                },
                 uuid in self.head_uuids,
             )
             for uuid in sorted_uuids
@@ -210,16 +239,8 @@ class Extractor:
             self.all_uuids.add(found.uuid)
             demos_here[found.uuid] = DemoSnapshot(
                 uuid_file_path=found.uuid_file_path,
-                normalized_hash=self._demo_hash(
-                    commit,
-                    found,
-                    True,
-                ),
-                full_hash=self._demo_hash(
-                    commit,
-                    found,
-                    False,
-                ),
+                full_hash=self._demo_hash(commit, found),
+                locale_normalized_hashes=self._locale_hashes(commit, found),
                 locales=_locale_codes(found.demo_tree),
             )
         self.commit_demos[commit.id] = demos_here
@@ -320,10 +341,8 @@ class Extractor:
             self,
             commit: pygit2.Commit,
             found: FoundDemo,
-            normalise_locale_metadata: bool,
     ) -> str:
-        """SHA-256 over the demo subtree, optionally ignoring the
-        ``recommended`` flag."""
+        """SHA-256 over the whole demo subtree."""
         h = hashlib.sha256()
         self._hash_tree(
             commit,
@@ -331,9 +350,48 @@ class Extractor:
             found.demo_tree,
             h,
             "",
-            normalise_locale_metadata,
+            False,
         )
         return h.hexdigest()
+
+    def _locale_hashes(
+            self,
+            commit: pygit2.Commit,
+            found: FoundDemo,
+    ) -> dict[str, str]:
+        """SHA-256 for each locale of the demo, ignoring the
+        ``recommended`` flag.
+
+        A locale's hash covers its own directory within ``by-locale``
+        together with everything shared by all locales, i.e.,
+        everything else in the demo.
+        """
+        demo_root = Path(found.uuid_file_path).parent
+        locales_dir_name = DemoRepoPaths.Locales_Dir.as_posix()
+
+        shared = hashlib.sha256()
+        locale_entries: list[tuple[str, pygit2.Object]] = []
+        for entry in sorted(found.demo_tree, key=name_of_tree_entry):
+            name = name_of_tree_entry(entry)
+            if name == locales_dir_name and entry.type_str == "tree":
+                locales_tree: pygit2.Tree = entry  # type: ignore
+                for sub_entry in sorted(locales_tree, key=name_of_tree_entry):
+                    rel = f"{name}/{name_of_tree_entry(sub_entry)}"
+                    if sub_entry.type_str == "tree":
+                        locale_entries.append((rel, sub_entry))
+                    else:
+                        self._hash_entry(
+                            commit, demo_root, sub_entry, rel, shared, True
+                        )
+            else:
+                self._hash_entry(commit, demo_root, entry, name, shared, True)
+
+        hashes: dict[str, str] = {}
+        for rel, entry in locale_entries:
+            h = shared.copy()
+            self._hash_entry(commit, demo_root, entry, rel, h, True)
+            hashes[_path_basename(rel)] = h.hexdigest()
+        return hashes
 
     def _hash_tree(
         self,
@@ -346,41 +404,65 @@ class Extractor:
     ):
         for entry in sorted(tree, key=name_of_tree_entry):
             rel = f"{prefix}/{entry.name}" if prefix else name_of_tree_entry(entry)
-            h.update(b"\x00P")
-            h.update(rel.encode("utf-8"))
-            if entry.type_str == "tree":
-                subtree: pygit2.Tree = entry  # type: ignore
-                self._hash_tree(
-                    commit, demo_root, subtree, h, rel, normalise_locale_metadata
+            self._hash_entry(
+                commit, demo_root, entry, rel, h, normalise_locale_metadata
+            )
+
+    def _hash_entry(
+        self,
+        commit: pygit2.Commit,
+        demo_root: Path,
+        entry: pygit2.Object,
+        rel: str,
+        h: hashlib._Hash,  # type: ignore[reportPrivateUsage]
+        normalise_locale_metadata: bool,
+    ):
+        """Add to ``h`` one entry, at path ``rel`` within the demo."""
+        h.update(b"\x00P")
+        h.update(rel.encode("utf-8"))
+        if entry.type_str == "tree":
+            subtree: pygit2.Tree = entry  # type: ignore
+            self._hash_tree(
+                commit, demo_root, subtree, h, rel, normalise_locale_metadata
+            )
+        elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
+            if entry.type_str != "blob":
+                raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
+
+            blob: pygit2.Blob = entry  # type: ignore
+            if entry_is_symlink(entry):
+                # A locale sharing another's metadata (as made by
+                # copy-demo-locale) has a symlink here, whose blob is
+                # the link text; normalize the file it points at.
+                blob = tree_entry_within_commit(  # type: ignore
+                    self.repo, str(commit.id), demo_root / rel, "blob"
                 )
-            elif _is_locale_metadata_path(rel) and normalise_locale_metadata:
-                if entry.type_str != "blob":
-                    raise RuntimeError(f'metadata tree entry "{rel}" is not blob')
 
-                blob: pygit2.Blob = entry  # type: ignore
-                if entry_is_symlink(entry):
-                    # A locale sharing another's metadata (as made by
-                    # copy-demo-locale) has a symlink here, whose blob is
-                    # the link text; normalize the file it points at.
-                    blob = tree_entry_within_commit(  # type: ignore
-                        self.repo, str(commit.id), demo_root / rel, "blob"
-                    )
-
-                # The "recommended" flag is ignored data, so we must read
-                # the blob, normalize it, and hash the normalized bytes.
-                data = _normalize_locale_metadata(rel, blob.data)
-                h.update(b"\x00B")
-                h.update(data)
-            else:
-                # A git blob's id is SHA-1 of ``"blob <len>\x00" + content``
-                # and therefore uniquely fingerprints the content, so we
-                # hash the id directly and spare a blob read from the
-                # object database.  Using a fixed-width id (20 bytes) also
-                # rules out the encoding-ambiguity collisions that the
-                # variable-length ``\x00B<data>`` form is otherwise prone
-                # to.
-                h.update(b"\x00I")
-                h.update(entry.id.raw)
+            # The "recommended" flag is ignored data, so we must read
+            # the blob, normalize it, and hash the normalized bytes.
+            data = _normalize_locale_metadata(rel, blob.data)
+            h.update(b"\x00B")
+            h.update(data)
+        else:
+            # A git blob's id is SHA-1 of ``"blob <len>\x00" + content``
+            # and therefore uniquely fingerprints the content, so we
+            # hash the id directly and spare a blob read from the
+            # object database.  Using a fixed-width id (20 bytes) also
+            # rules out the encoding-ambiguity collisions that the
+            # variable-length ``\x00B<data>`` form is otherwise prone
+            # to.
+            target: pygit2.Object = entry
+            if entry_is_symlink(entry):
+                # What is served is the file a symlink points at, so
+                # hash that, not the link text.  Otherwise a change
+                # to the target (e.g., another locale's copy of a
+                # shared file, or a file outside the demo) would go
+                # unnoticed.
+                target = tree_entry_within_commit(
+                    self.repo, str(commit.id), demo_root / rel, "blob"
+                )
+            h.update(b"\x00I")
+            h.update(target.id.raw)
 
     # ---------------------------------------------------------------
     # Detecting UUID replacements (major-version chain links)
@@ -459,105 +541,85 @@ class Extractor:
         return heads
 
     # ---------------------------------------------------------------
-    # Finding the defining commit of each demo-major-version
+    # Finding the latest modification commit of each demo-major-version
     # ---------------------------------------------------------------
 
-    def _find_defining_commits(
+    def _find_latest_modifications[K](
             self,
-            normalise_locale_metadata: bool,
-    ) -> dict[str, DefiningCommit]:
-        """Find the unique most-recent modification commit for every UUID."""
-        mod_commits: dict[str, list[pygit2.Commit]] = defaultdict(list)
+            hashes_of: Callable[[dict[str, DemoSnapshot]], dict[K, str]],
+            describe_key: Callable[[K], str],
+    ) -> dict[K, pygit2.Commit]:
+        """Find the unique most-recent modification commit for every key.
+
+        ``hashes_of`` maps one commit's demos (a value of
+        ``commit_demos``) to a hash for each key present in that commit.
+        The caller chooses what a key is and what its hash covers.
+        ``describe_key`` gives a key's description for error messages.
+        """
+        key_hashes: dict[pygit2.Oid, dict[K, str]] = {
+            commit.id: hashes_of(self.commit_demos[commit.id])
+            for commit in self.head_ancestry
+        }
+
+        # Every key present in some commit within HEAD's ancestry gets at
+        # least one entry here, because the commit which first introduces
+        # it is necessarily a modification commit.
+        mod_commits: dict[K, list[pygit2.Commit]] = defaultdict(list)
         for commit in self.head_ancestry:
-            demos_here = self.commit_demos[commit.id]
-            for uuid, snapshot in demos_here.items():
-                effective_hash = snapshot.effective_hash(
-                    normalise_locale_metadata
-                )
-                if self._is_modification(
-                        commit,
-                        uuid,
-                        effective_hash,
-                        normalise_locale_metadata,
-                ):
-                    mod_commits[uuid].append(commit)
+            for key, h in key_hashes[commit.id].items():
+                if self._is_modification(commit, key, h, key_hashes):
+                    mod_commits[key].append(commit)
 
-        defining: dict[str, DefiningCommit] = {}
-        for uuid in self.all_uuids:
-            candidates = mod_commits.get(uuid, [])
-            # Every UUID in all_uuids appears in some commit's tree within
-            # HEAD's ancestry (collected by _iter_demos), and the commit
-            # that first introduces it is necessarily a modification
-            # commit, so mod_commits[uuid] is non-empty.
-            if not candidates:
-                raise AssertionError(f"no modification commit found for UUID {uuid}")
-
+        latest: dict[K, pygit2.Commit] = {}
+        for key, candidates in mod_commits.items():
             maxima = self._topological_maxima(candidates)
             if len(maxima) > 1:
                 # Interpretation note: the spec says the *state* must be
-                # well-defined.  If the normalized content of the demo
-                # agrees across all maxima then only the choice of *SHA1*
-                # is ambiguous; I treat that as well-defined and pick
-                # deterministically (latest commit_time, then
-                # lexicographically largest SHA1).  If the content itself
-                # disagrees the state really is ambiguous and we raise,
-                # as the spec instructs.
-                hashes = {
-                    (
-                        self
-                        .commit_demos[m.id][uuid]
-                        .effective_hash(normalise_locale_metadata)
-                    )
-                    for m in maxima
-                }
+                # well-defined.  If the hashed content agrees across all
+                # maxima then only the choice of *SHA1* is ambiguous; I
+                # treat that as well-defined and pick deterministically
+                # (latest commit_time, then lexicographically largest
+                # SHA1).  If the content itself disagrees the state
+                # really is ambiguous and we raise, as the spec
+                # instructs.
+                hashes = {key_hashes[m.id][key] for m in maxima}
                 if len(hashes) > 1:
                     sha_list = ", ".join(str(m.id) for m in maxima)
                     raise RuntimeError(
                         f"Ambiguous most-recent state for demo-major-version "
-                        f"{uuid}: incomparable modification commits "
+                        f"{describe_key(key)}: incomparable modification commits "
                         f"{sha_list} have differing content.  See "
                         f"old-versions.md for how to disambiguate."
                     )
                 maxima.sort(key=lambda c: (c.commit_time, str(c.id)), reverse=True)
-            chosen = maxima[0]
-            defining[uuid] = DefiningCommit(
-                sha1=str(chosen.id),
-                uuid_file_path=self.commit_demos[chosen.id][uuid].uuid_file_path,
-            )
+            latest[key] = maxima[0]
 
-        return defining
+        return latest
 
-    def _is_modification(
+    def _is_modification[K](
             self,
             commit: pygit2.Commit,
-            uuid: str,
+            key: K,
             h: str,
-            normalise_locale_metadata: bool,
+            key_hashes: dict[pygit2.Oid, dict[K, str]],
     ) -> bool:
-        """True if ``commit`` updated the contents of demo ``uuid``.
+        """True if ``commit`` updated the content identified by ``key``.
 
-        A commit is a "modification commit" for a demo if the demo exists
-        in the commit's tree and the demo's (normalized) content differs
-        from every parent's version of that same demo (including parents
-        that don't have the demo at all).  In particular, a merge commit
-        that simply inherits its demo content from one of its parents is
-        NOT a modification commit, which is what lets example 2 in the
-        spec resolve unambiguously.
+        A commit is a "modification commit" for a key if the key's hash
+        in the commit (``h``) differs from every parent's hash for that
+        key (including parents that don't have the key at all).  In
+        particular, a merge commit that simply inherits its content from
+        one of its parents is NOT a modification commit, which is what
+        lets example 2 in the spec resolve unambiguously.
 
-        A root commit (no parents) that contains the demo is trivially a
+        A root commit (no parents) that has the key is trivially a
         modification commit.
         """
         for parent in commit.parents:
             # Invariant: every parent of a HEAD-ancestor is itself a
-            # HEAD-ancestor, so parent.id is always a key of commit_demos.
-            parent_demos = self.commit_demos[parent.id]
-            parent_snapshot = parent_demos.get(uuid)
-            if parent_snapshot is not None:
-                parent_hash = parent_snapshot.effective_hash(
-                    normalise_locale_metadata
-                )
-                if parent_hash == h:
-                    return False
+            # HEAD-ancestor, so parent.id is always a key of key_hashes.
+            if key_hashes[parent.id].get(key) == h:
+                return False
         return True
 
     def _topological_maxima(self, commits: list[pygit2.Commit]):

@@ -98,14 +98,33 @@ def test_extracted_records(history: History, built: BuiltRepo, scenario: dict) -
 
         # The "mtime commit" is the most recent change OTHER than just
         # a "recommended" flip, so it can lag behind the "defining
-        # commit" (see `live` and `beacon`).
+        # commit" (see `live` and `beacon`).  It is per locale; a
+        # mapping gives it for each locale, and a single commit is
+        # shorthand for "this commit, for every locale".
         if "mtime_at" in want:
-            want_sha = built.commit_oids[want["mtime_at"]]
-            got_sha = extractor.effective_mtime_commits[uuid]
-            assert got_sha == want_sha, (
-                f"{alias}: mtime_at {got_sha} != {want_sha} "
-                f"({want['mtime_at']})"
-            )
+            want_mtime_at = want["mtime_at"]
+            if isinstance(want_mtime_at, dict):
+                for locale, commit_id in want_mtime_at.items():
+                    want_sha = built.commit_oids[commit_id]
+                    got_sha = extractor.effective_mtime_commits[(uuid, locale)]
+                    assert got_sha == want_sha, (
+                        f"{alias}/{locale}: mtime_at {got_sha} != {want_sha}"
+                        f" ({commit_id})"
+                    )
+            else:
+                want_sha = built.commit_oids[want_mtime_at]
+                got_shas = {
+                    locale: sha
+                    for (mtime_uuid, locale), sha
+                    in extractor.effective_mtime_commits.items()
+                    if mtime_uuid == uuid
+                }
+                assert got_shas, f"{alias}: no mtime commits"
+                for locale, got_sha in got_shas.items():
+                    assert got_sha == want_sha, (
+                        f"{alias}/{locale}: mtime_at {got_sha} != {want_sha}"
+                        f" ({want_mtime_at})"
+                    )
 
         if "program_kind" in want:
             assert record.common_program_kind() == want["program_kind"], alias
@@ -170,7 +189,9 @@ def test_build_dist_marks_deleted_demo(
     listed = {e["uuid"] for e in dist_demos_index}
     named_live = {
         history.uuid(a)
-        for a in ("live", "superB", "mover", "descr", "beacon", "poly")
+        for a in (
+            "live", "superB", "mover", "descr", "beacon", "poly", "bilingual"
+        )
     }
     bulk_uuids = {d["uuid"] for d in bulk_demos(history.bulk)}
     assert listed == named_live | bulk_uuids
@@ -410,10 +431,44 @@ def test_all_demos_index_combines_language_indexes(dist: Path) -> None:
         return (e["uuid"], e["language"])
 
     assert sorted(all_demos, key=key) == sorted(expected, key=key)
-    assert {e["language"] for e in all_demos} == {"en", "ga"}
+    assert {e["language"] for e in all_demos} == {"en", "ga", "de"}
 
     recency = [(e["lastUpdated"], e["uuid"]) for e in all_demos]
     assert recency == sorted(recency, reverse=True)
+
+
+def test_demo_without_en_locale_is_served_in_its_own_locale(
+    history: History, dist: Path
+) -> None:
+    """A demo with only a `ga` locale is served (content and index entry)
+    in `ga` alone, and appears in the cross-language index once."""
+    uuid = history.uuid("gaonly")
+
+    def index_uuids(language: str) -> set[str]:
+        index_path = dist / "index" / language / "demos.json"
+        return {e["uuid"] for e in json.loads(index_path.read_text())}
+
+    assert uuid in index_uuids("ga")
+    assert uuid not in index_uuids("en")
+    assert (dist / uuid / "ga" / "metadata.json").is_file()
+    assert not (dist / uuid / "en").exists()
+
+    all_demos = json.loads((dist / "index" / "all-demos.json").read_text())
+    languages = [e["language"] for e in all_demos if e["uuid"] == uuid]
+    assert languages == ["ga"]
+
+
+def test_recommended_flag_can_differ_between_locales(
+    history: History, dist: Path
+) -> None:
+    """A demo whose `de` locale has its own "recommended" flag is served
+    with a different flag in each language."""
+    uuid = history.uuid("bilingual")
+    all_demos = json.loads((dist / "index" / "all-demos.json").read_text())
+    recommended = {
+        e["language"]: e["recommended"] for e in all_demos if e["uuid"] == uuid
+    }
+    assert recommended == {"en": True, "de": False}
 
 
 def test_all_demos_index_mismatch_is_reported(dist: Path, tmp_path: Path) -> None:

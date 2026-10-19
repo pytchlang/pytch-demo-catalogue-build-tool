@@ -14,10 +14,13 @@
 # only `recommended` must not alter content).  `programKind` (required, no
 # default) selects which project template in this package's data/ dir the
 # demo is built from.  `chapters` (default 1) sets how many `#`-headed
-# chapters description.md has, `video: true` adds a video thumbnail, and
+# chapters description.md has, `video: true` adds a video thumbnail,
 # `assets: true` adds a content-assets directory (shared between the demo's
-# locales by symlink); all are content, so paired commits that must not
-# count as a change have to agree on them too.
+# locales by symlink), and `assetsEdited: true` changes those assets'
+# contents; all are content, so paired commits that must not count as a
+# change have to agree on them too.  `localeDescriptions` maps a locale to
+# a description used for that locale alone, in place of `description`, and
+# `localeRecommended` likewise maps a locale to its own `recommended` flag.
 #
 # `uuids` gives short aliases so the rest of the file stays readable; an
 # alias is resolved to its uuid wherever a uuid is expected (in `ops` and
@@ -40,6 +43,9 @@ uuids:
   ambV2:  "99999999-9999-4999-8999-999999999999"
   shrinkA: "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
   shrinkB: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+  lmt:    "ffffffff-ffff-4fff-8fff-ffffffffffff"
+  gaonly: "12121212-1212-4212-8212-121212121212"
+  bilingual: "34343434-3434-4434-8434-343434343434"
 
 # --- The main catalogue history (linear) -------------------------------
 commits:
@@ -183,6 +189,26 @@ commits:
       # multi-chapter (and add-story's was single), itself a content change.
       - {kind: put, demo: story, uuid: descr, programKind: flat, chapters: 2}
 
+  - id: add-ga-only
+    branch: catalogue
+    message: "Add a demo available only in ga"
+    ops:
+      # No `en` locale at all, so a front end showing every demo has to
+      # fall back to another language for it.
+      - {kind: put, demo: seanchai, uuid: gaonly, programKind: flat,
+         locales: [ga], displayName: "Gaeilge-only demo",
+         recommended: false}
+
+  - id: add-bilingual
+    branch: catalogue
+    message: "Add a demo in en and de, recommended only in en"
+    ops:
+      # `de` has its own "recommended" flag, so which demos a front end
+      # recommends depends on the language it shows each demo in.
+      - {kind: put, demo: bilingual, uuid: bilingual, programKind: per-method,
+         locales: [en, de], displayName: "English-and-German demo",
+         localeRecommended: {de: false}}
+
 # --- A non-linear history that is ambiguous (old-versions.md example) ---
 #
 #   A -> B -> C -> D ----+-> G -> H        (branch: ambiguous)
@@ -275,6 +301,75 @@ commits:
     ops:
       - {kind: put, demo: shrink, uuid: shrinkB, programKind: flat}
 
+# --- Per-locale mtimes ------------------------------------------------
+#
+#   A -> B -> C -> D -> E -> F -> G      (a branch at each of B--G)
+#
+# Each commit changes a different part of demo lmt, whose `ga` locale
+# links to `en`'s content assets.  Every put repeats the earlier
+# commits' changes, so each commit changes only what its message says.
+  - id: lmt-A
+    parents: []
+    message: "A: introduce the demo in one locale"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo"}
+
+  - id: lmt-B
+    branch: locale-mtime-add-ga
+    message: "B: add a locale (touches only the new locale)"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga]}
+
+  - id: lmt-C
+    branch: locale-mtime-edit-ga
+    message: "C: edit content of only the ga locale"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {ga: "The lmt demo, reworded in ga"}}
+
+  - id: lmt-D
+    branch: locale-mtime-edit-asset
+    message: "D: edit an asset of en, linked to by ga"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true}
+
+  - id: lmt-E
+    branch: locale-mtime-edit-en
+    message: "E: edit content of only the en locale"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {en: "The lmt demo, reworded in en",
+                              ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true}
+
+  - id: lmt-F
+    branch: locale-mtime-edit-shared
+    message: "F: edit metadata shared by all locales"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {en: "The lmt demo, reworded in en",
+                              ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true, authorName: "Grace Hopper"}
+
+  - id: lmt-G
+    branch: locale-mtime-flip-recommended
+    message: "G: flip the recommended flag (not an mtime change)"
+    ops:
+      - {kind: put, demo: lmt, uuid: lmt, programKind: flat, assets: true,
+         description: "The lmt demo", locales: [en, ga],
+         localeDescriptions: {en: "The lmt demo, reworded in en",
+                              ga: "The lmt demo, reworded in ga"},
+         assetsEdited: true, authorName: "Grace Hopper",
+         recommended: false}
+
 # --- What each branch's extracted records should look like -------------
 scenarios:
   - start_ref: catalogue
@@ -302,6 +397,10 @@ scenarios:
                mtime_at: edit-beacon, program_kind: flat}
       poly:   {latest: poly,   present: true,  defined_at: add-polyglot,
                mtime_at: add-polyglot, program_kind: per-method}
+      gaonly: {latest: gaonly, present: true,  defined_at: add-ga-only,
+               mtime_at: {ga: add-ga-only}}
+      bilingual: {latest: bilingual, present: true,
+                  defined_at: add-bilingual, mtime_at: add-bilingual}
 
   - start_ref: ambiguous
     expect_error: "[Aa]mbiguous"
@@ -314,6 +413,36 @@ scenarios:
       shrinkA: {latest: shrinkB, present: false, defined_at: shrink-Q}
       shrinkB: {latest: shrinkB, present: true,  defined_at: shrink-S}
 
+  - start_ref: locale-mtime-add-ga
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-B,
+            mtime_at: {en: lmt-A, ga: lmt-B}}
+
+  - start_ref: locale-mtime-edit-ga
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-C,
+            mtime_at: {en: lmt-A, ga: lmt-C}}
+
+  - start_ref: locale-mtime-edit-asset
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-D,
+            mtime_at: {en: lmt-D, ga: lmt-D}}
+
+  - start_ref: locale-mtime-edit-en
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-E,
+            mtime_at: {en: lmt-E, ga: lmt-D}}
+
+  - start_ref: locale-mtime-edit-shared
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-F,
+            mtime_at: {en: lmt-F, ga: lmt-F}}
+
+  - start_ref: locale-mtime-flip-recommended
+    expect:
+      lmt: {latest: lmt, present: true, defined_at: lmt-G,
+            mtime_at: {en: lmt-F, ga: lmt-F}}
+
 # --- Bulk live demos for front-end pagination tests --------------------
 #
 # Hand-writing these would be unreadable, so repo_builder expands this
@@ -323,7 +452,7 @@ scenarios:
 # catalogue index.  Their uuids are derived deterministically from the demo
 # name, so the built dist is stable across runs.
 bulk:
-  after: reword-story
+  after: add-bilingual
   branch: catalogue
   count: 25
   programKinds: [flat, per-method]

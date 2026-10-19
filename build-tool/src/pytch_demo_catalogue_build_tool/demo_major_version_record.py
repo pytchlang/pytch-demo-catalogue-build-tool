@@ -29,7 +29,8 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
     latest_uuid: Optional[str]
     _defining_commit_id: str
     _demo_root_path: Path
-    _effective_mtime_commit_id: str
+    # Locale code -> id of that locale's effective mtime commit.
+    _effective_mtime_commit_ids: dict[str, str]
     _present_at_head: bool
 
     @property
@@ -211,9 +212,8 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         path = self.demo_root_path / constants.DemoRepoPaths.Global_Metadata_File
         return self.json_dict_within_commit(path)
 
-    @property
-    def effective_mtime_str(self) -> str:
-        mtime_commit = self._commit(self._effective_mtime_commit_id)
+    def effective_mtime_str(self, locale_code: str) -> str:
+        mtime_commit = self._commit(self._effective_mtime_commit_ids[locale_code])
         mtime = time.gmtime(mtime_commit.author.time)
         return time.strftime("%Y-%m-%dT%H:%M:%SZ", mtime)
 
@@ -223,7 +223,7 @@ class DemoMajorVersionRecord(MultiLocaleDemo):
         ZipfileMetadataKeys = constants.PytchZipfileMetadataKeys
         display_name = ctx.project_metadata[ZipfileMetadataKeys.Project_Name]
 
-        last_updated = self.effective_mtime_str
+        last_updated = self.effective_mtime_str(locale_code)
 
         summary_markdown = self.text_within_commit(ctx.repo_summary_path)
 

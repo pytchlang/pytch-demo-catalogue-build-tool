@@ -57,6 +57,14 @@ _TINY_PNG = bytes.fromhex(
     "6082"
 )
 
+# A different (opaque white) 1x1 PNG, for a content asset which has been
+# edited.
+_TINY_PNG_EDITED = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+    "890000000b49444154789c63f80f040009fb03fdfb5e6b2b0000000049454e44"
+    "ae426082"
+)
+
 # A stand-in MP4 for demos that carry a video thumbnail.  The build tool only
 # copies thumbnail bytes verbatim, so any bytes suffice for its own tests; a
 # real (if tiny) clip keeps the output usable as a fixture for a front-end
@@ -196,8 +204,9 @@ class FileState:
             base = f"by-locale/{locale}"
             owner_base = f"by-locale/{owner_locale}"
             is_owner = locale == owner_locale
-            if is_owner:
-                put(f"{base}/metadata.json", _json({"recommended": spec.recommended}))
+            if is_owner or locale in spec.locale_recommended:
+                recommended = spec.recommended_for(locale)
+                put(f"{base}/metadata.json", _json({"recommended": recommended}))
             else:
                 # As made by copy-demo-locale, a sharing locale's
                 # metadata is a link to the owner's, so the build tool
@@ -207,7 +216,7 @@ class FileState:
             # renders each chapter separately); its first chapter's body is
             # the commit message (see DemoSpec.description), so the built dist
             # still reveals which commit last defined the demo.
-            put(f"{base}/content/description.md", spec.render_description())
+            put(f"{base}/content/description.md", spec.render_description(locale))
             put(f"{base}/content/summary.md", spec.render_summary(locale))
             put(f"{base}/content/thumbnail.png", _TINY_PNG)
             # Some demos also carry a video thumbnail; the build tool picks it
@@ -216,7 +225,11 @@ class FileState:
                 put(f"{base}/content/thumbnail.mp4", _TINY_MP4)
             if spec.has_content_assets:
                 if is_owner:
-                    put(f"{base}/content/assets/diagram.png", _TINY_PNG)
+                    diagram = (
+                        _TINY_PNG_EDITED if spec.content_assets_edited
+                        else _TINY_PNG
+                    )
+                    put(f"{base}/content/assets/diagram.png", diagram)
                     # An asset which is a link to content outside assets/,
                     # so following it has to resolve "../summary.md"
                     # against the directory the link itself lives in.
@@ -342,11 +355,24 @@ class DemoSpec:
     # description).  Only the first locale holds the files themselves;
     # any other locale shares them via a symlink.
     has_content_assets: bool = False
+    # Whether those content assets are an edited version, which changes
+    # the (shared) content of every locale.
+    content_assets_edited: bool = False
     # When set, overrides the project template's projectName (the demo's
     # displayName); otherwise the template's own value is kept.
     display_name: Optional[str] = None
+    # Per-locale replacements for `description`, so that one locale's
+    # content can change while another's stays the same.
+    locale_descriptions: dict[str, str] = field(default_factory=dict)
+    # Per-locale replacements for `recommended`.  A non-owner locale
+    # listed here gets its own metadata.json rather than a link to the
+    # owner's.
+    locale_recommended: dict[str, bool] = field(default_factory=dict)
 
-    def render_description(self) -> bytes:
+    def recommended_for(self, locale: str) -> bool:
+        return self.locale_recommended.get(locale, self.recommended)
+
+    def render_description(self, locale: str) -> bytes:
         """Render this demo's ``description.md`` as one or more ``#``-headed
         chapters.
 
@@ -355,7 +381,8 @@ class DemoSpec:
         ``self.chapters`` selects how many (several demos deliberately use
         more than one so multi-chapter rendering is exercised).
 
-        The first chapter's body is ``self.description`` -- i.e. the defining
+        The first chapter's body is ``self.description`` (or the locale's
+        entry in ``self.locale_descriptions``) -- by default the defining
         commit's message -- so the built dist still identifies which commit
         last defined the demo, and two commits that share a ``description``
         (and ``chapters``) still produce byte-identical content.
@@ -363,8 +390,9 @@ class DemoSpec:
         The bodies carry a little inline markdown so a front end has
         non-trivial markup to render and round-trip.
         """
+        description = self.locale_descriptions.get(locale, self.description)
         chapters = [
-            f"# Introduction\n\nThis is the **{self.description}**.\n"
+            f"# Introduction\n\nThis is the **{description}**.\n"
         ]
         for n in range(2, self.chapters + 1):
             chapters.append(
@@ -518,7 +546,10 @@ def _resolve_demo_spec(
         chapters=op.get("chapters", 1),
         has_video=op.get("video", False),
         has_content_assets=op.get("assets", False),
+        content_assets_edited=op.get("assetsEdited", False),
         display_name=op.get("displayName"),
+        locale_descriptions=op.get("localeDescriptions", {}),
+        locale_recommended=op.get("localeRecommended", {}),
     )
 
 
